@@ -3,6 +3,10 @@ from pathlib import Path
 import subprocess
 from typing import List, Optional, Union
 
+from config import STL_FILENAME
+
+PRUSA_PATH = Path("C:/Program Files/Prusa3D/PrusaSlicer")
+
 
 @dataclass
 class SliceOptions:
@@ -21,7 +25,9 @@ class SliceOptions:
     @property
     def cli_args(self) -> List[str]:
         return [
-            "prusa-slicer-console.exe",
+            (PRUSA_PATH / "prusa-slicer-console.exe").as_posix()
+            if PRUSA_PATH.exists()
+            else "prusa-slicer-console.exe",
             "--load",
             str(self.config),
             "--export-gcode",
@@ -63,9 +69,10 @@ def find_duplicate_keys(file_path):
 
 
 if __name__ == "__main__":
-    stl_path = Path("specimen.stl")
-    output_folder = Path("gcode")
-    output_folder.mkdir(exist_ok=True)
+    stl_path = Path(STL_FILENAME)
+    output_folder_name = "gcode"
+    clean_folder(output_folder_name)
+    Path(output_folder_name).mkdir(exist_ok=True)
 
     for config_file in Path("config").glob("*.ini"):
         duplicate_keys = find_duplicate_keys(config_file)
@@ -76,6 +83,7 @@ if __name__ == "__main__":
         options = SliceOptions(
             stl=stl_path,
             config=config_file,
-            output=output_folder / config_file.name.replace(".ini", ".gcode"),
+            output=Path(output_folder_name)
+            / config_file.name.replace(".ini", ".gcode"),
         )
         subprocess.run(options.cli_args)

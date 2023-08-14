@@ -6,6 +6,14 @@ import os
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple, Union
 
+from config import (
+    BED_TEMPERATURES,
+    EXTRUDER_TEMPERATURES,
+    FAN_SPEEDS,
+    INFILL_SPEEDS,
+    LAYER_THICKNESSES,
+)
+
 
 @dataclass
 class Settings:
@@ -25,11 +33,12 @@ class FilamentSettings(Settings):
     fan_speed: int
     bed_temperature: int
     extruder_temperature: int
-    infill_overlap: str
+    # infill_overlap: str
 
     @property
     def filename(self) -> str:
-        return f"FS{self.fan_speed}_BT{self.bed_temperature}_ET{self.extruder_temperature}_IO{self.infill_overlap}.ini"
+        return f"FS{self.fan_speed}_BT{self.bed_temperature}_ET{self.extruder_temperature}.ini"
+        # return f"FS{self.fan_speed}_BT{self.bed_temperature}_ET{self.extruder_temperature}_IO{self.infill_overlap}.ini"
 
     @property
     def ini_keys(self) -> Dict[str, Iterable[str]]:
@@ -223,11 +232,6 @@ if __name__ == "__main__":
 
     # 필라멘트
     folder_name = "filament"
-    fan_speeds = (0, 100)
-    bed_temperatures = (50, 70)
-    extruder_temperatures = (200, 210)
-    infill_overlaps = ("15%", "35%")
-
     clean_folder(folder_name, except_files=[template_filename])
     config[folder_name] = []
     for setting in (
@@ -235,13 +239,13 @@ if __name__ == "__main__":
             fan_speed=fan_speed,
             bed_temperature=bed_temperature,
             extruder_temperature=extruder_temperature,
-            infill_overlap=infill_overlap,
+            # infill_overlap=infill_overlap,
         )
-        for fan_speed, bed_temperature, extruder_temperature, infill_overlap in product(
-            fan_speeds,
-            bed_temperatures,
-            extruder_temperatures,
-            infill_overlaps,
+        for fan_speed, bed_temperature, extruder_temperature in product(
+            FAN_SPEEDS,
+            BED_TEMPERATURES,
+            EXTRUDER_TEMPERATURES,
+            # infill_overlaps,
         )
     ):
         config[folder_name].append(
@@ -250,9 +254,6 @@ if __name__ == "__main__":
 
     # 프린팅
     folder_name = "print"
-    layer_thicknesses = (0.1, 0.2)
-    infill_speeds = (50, 60)
-
     clean_folder(folder_name, except_files=[template_filename])
     config[folder_name] = []
     for setting in (
@@ -261,7 +262,7 @@ if __name__ == "__main__":
             infill_speed=infill_speed,
         )
         for layer_thickness, infill_speed in product(
-            layer_thicknesses, infill_speeds
+            LAYER_THICKNESSES, INFILL_SPEEDS
         )
     ):
         config[folder_name].append(
