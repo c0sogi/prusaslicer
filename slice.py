@@ -6,6 +6,11 @@ from typing import List, Optional, Union
 from config import STL_FILENAME
 
 PRUSA_PATH = Path("C:/Program Files/Prusa3D/PrusaSlicer")
+PRUSA_CLI_EXECUTABLE = (
+    (PRUSA_PATH / "prusa-slicer-console.exe").as_posix()
+    if PRUSA_PATH.exists()
+    else "prusa-slicer-console.exe"
+)
 
 
 @dataclass
@@ -25,9 +30,7 @@ class SliceOptions:
     @property
     def cli_args(self) -> List[str]:
         return [
-            (PRUSA_PATH / "prusa-slicer-console.exe").as_posix()
-            if PRUSA_PATH.exists()
-            else "prusa-slicer-console.exe",
+            PRUSA_CLI_EXECUTABLE,
             "--load",
             str(self.config),
             "--export-gcode",
@@ -45,7 +48,7 @@ def clean_folder(
             file_path.unlink()
 
 
-def find_duplicate_keys(file_path):
+def find_duplicate_keys(file_path: Union[str, Path]) -> List[str]:
     keys = {}
     duplicate_keys = []
 
@@ -69,11 +72,21 @@ def find_duplicate_keys(file_path):
 
 
 if __name__ == "__main__":
+    try:
+        exit_code = subprocess.call(
+            [PRUSA_CLI_EXECUTABLE, "-h"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        assert exit_code == 0, "PrusaSlicer CLI 실행 불가"
+    except Exception as e:
+        print(f"PrusaSlicer CLI 실행 불가: {e}")
+        raise e
+
     stl_path = Path(STL_FILENAME)
     output_folder_name = "gcode"
     clean_folder(output_folder_name)
     Path(output_folder_name).mkdir(exist_ok=True)
-
     for config_file in Path("config").glob("*.ini"):
         duplicate_keys = find_duplicate_keys(config_file)
         if duplicate_keys:

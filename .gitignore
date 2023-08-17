@@ -1,5 +1,8 @@
+PRIVATE_*
 *.pyc
 *.ini
 *.gcode
+*.json
+*.png
 !printer/*
 !template.ini
