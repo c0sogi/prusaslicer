@@ -173,7 +173,8 @@ if __name__ == "__main__":
     )
 
     # 파일로 저장합니다.
-    filename = f"result_{datetime.now().strftime('%Y_%m_%d_%H%M%S')}.json"
+    now = datetime.now().strftime("%Y_%m_%d_%H%M%S")
+    filename = f"result_{now}.json"
     with open(filename, "w") as file:
         file.write(json.dumps(data, indent=4))
         print(f"파일 저장 완료: {filename}")
@@ -187,19 +188,11 @@ if __name__ == "__main__":
             for filename, kv_dict in data.items()
         }.items()
     ]
-    # data_list = [
-    #     {"lt": 0.1, "is": 50, "td": timedelta(hours=1)},
-    #     {"lt": 0.1, "is": 70, "td": timedelta(hours=2)},
-    #     {"lt": 0.2, "is": 50, "td": timedelta(hours=3)},
-    #     {"lt": 0.2, "is": 70, "td": timedelta(hours=4)},
-    #     {"lt": 0.3, "is": 50, "td": timedelta(hours=5)},
-    #     {"lt": 0.3, "is": 70, "td": timedelta(hours=6)},
-    # ]
     plot_matrix(
         data_list,
         "first_layer_height",
         "infill_speed",
         KEYS_OF_INTEREST[3],
         lambda td: td.total_seconds(),
-        Path("result.png"),
+        Path(f"result_{now}.png"),
     )
