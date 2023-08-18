@@ -10,8 +10,12 @@ from config import (
     BED_TEMPERATURES,
     EXTRUDER_TEMPERATURES,
     FAN_SPEEDS,
+    FILL_DENSITY,
+    FILL_PATTERN,
     INFILL_SPEEDS,
     LAYER_THICKNESSES,
+    PRINTER_NAME,
+    START_GCODE,
 )
 
 
@@ -26,6 +30,21 @@ class Settings:
     @property
     def ini_keys(self) -> Dict[str, Iterable[str]]:
         raise NotImplementedError
+
+
+@dataclass
+class PrinterSettings(Settings):
+    start_gcode: str
+
+    @property
+    def filename(self) -> str:
+        return f"{PRINTER_NAME}.ini"
+
+    @property
+    def ini_keys(self) -> Dict[str, Iterable[str]]:
+        return {
+            "start_gcode": ("start_gcode",),
+        }
 
 
 @dataclass
@@ -75,6 +94,8 @@ class PrintSettings(Settings):
     solid_infill_speed: int = field(init=False)
     top_solid_infill_speed: int = field(init=False)
     travel_speed: int = field(init=False, default=150)
+    fill_density: str = field(init=False, default=FILL_DENSITY)
+    fill_pattern: str = field(init=False, default=FILL_PATTERN)
 
     def __post_init__(self) -> None:
         self.bridge_speed = int(self.infill_speed * 1.2)
@@ -110,6 +131,8 @@ class PrintSettings(Settings):
             "solid_infill_speed": ("solid_infill_speed",),
             "top_solid_infill_speed": ("top_solid_infill_speed",),
             "travel_speed": ("travel_speed",),
+            "fill_density": ("fill_density",),
+            "fill_pattern": ("fill_pattern",),
         }
 
 
@@ -225,10 +248,16 @@ def combine_configs(
 # first_layer_temperature = 205 | 240
 # temperature = 210 | 235
 if __name__ == "__main__":
-    # 프린터
-    printer_path = "./printer/ultimaker2.ini"
+    config: Dict[str, List[str]] = {}
     template_filename = "template.ini"
-    config: Dict[str, List[str]] = {"printer": [printer_path]}
+
+    # 프린터
+    folder_name = "printer"
+    config[folder_name] = []
+    setting = PrinterSettings(start_gcode=START_GCODE)
+    config[folder_name].append(
+        export_settings(setting, folder_name, setting.filename)
+    )
 
     # 필라멘트
     folder_name = "filament"

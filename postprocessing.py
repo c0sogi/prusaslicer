@@ -141,7 +141,7 @@ def plot_matrix(
     ax.set_xlabel(x_label)
     ax.set_ylabel(y_label)
     plt.colorbar(cax, orientation="vertical")
-    plt.title(f"{value_label} Matrix")
+    plt.title(value_label.title() + "(s)", pad=20, fontsize=20)
 
     if output_path:
         plt.savefig(output_path, bbox_inches="tight")
