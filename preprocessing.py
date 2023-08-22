@@ -16,6 +16,7 @@ from config import (
     LAYER_THICKNESSES,
     PRINTER_NAME,
     START_GCODE,
+    TRAVEL_SPEED,
 )
 
 
@@ -93,9 +94,9 @@ class PrintSettings(Settings):
     perimeter_speed: int = field(init=False)
     solid_infill_speed: int = field(init=False)
     top_solid_infill_speed: int = field(init=False)
-    travel_speed: int = field(init=False, default=150)
-    fill_density: str = field(init=False, default=FILL_DENSITY)
-    fill_pattern: str = field(init=False, default=FILL_PATTERN)
+    travel_speed: int = TRAVEL_SPEED
+    fill_density: str = FILL_DENSITY
+    fill_pattern: str = FILL_PATTERN
 
     def __post_init__(self) -> None:
         self.bridge_speed = int(self.infill_speed * 1.2)

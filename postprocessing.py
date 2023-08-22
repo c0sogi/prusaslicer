@@ -134,7 +134,7 @@ def plot_matrix(
         for j in range(len(y_values)):
             value = matrix[i][j]
             value_str = (
-                str(matrix[j][i]) if value != float("-inf") else "N/A"
+                str(matrix[i][j]) if value != float("-inf") else "N/A"
             )  # noqa: E501
             ax.text(j, i, value_str, ha="center", va="center")
 

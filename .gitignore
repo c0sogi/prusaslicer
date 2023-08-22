@@ -4,5 +4,9 @@ PRIVATE_*
 *.gcode
 *.json
 *.png
+*.log
+*.h5
+*.keras
+checkpoint/*
 !printer/*
 !template.ini

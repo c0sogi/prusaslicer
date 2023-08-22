@@ -87,7 +87,8 @@ if __name__ == "__main__":
     output_folder_name = "gcode"
     clean_folder(output_folder_name)
     Path(output_folder_name).mkdir(exist_ok=True)
-    for config_file in Path("config").glob("*.ini"):
+    config_file_names = sorted(Path("config").glob("*.ini"))
+    for file_no, config_file in enumerate(config_file_names, start=1):
         duplicate_keys = find_duplicate_keys(config_file)
         if duplicate_keys:
             raise ValueError(
@@ -97,6 +98,6 @@ if __name__ == "__main__":
             stl=stl_path,
             config=config_file,
             output=Path(output_folder_name)
-            / config_file.name.replace(".ini", ".gcode"),
+            / (f"{file_no}_" + config_file.name.replace(".ini", ".gcode")),
         )
-        subprocess.run(options.cli_args)
+        subprocess.run(options.cli_args, check=True, stdout=subprocess.DEVNULL)
