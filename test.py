@@ -4,7 +4,7 @@ from nn.train import Trainer
 
 if __name__ == "__main__":
     ann_config = ANNConfig(
-        kfold_splits=0,
+        kfold_splits=2,
         print_per_epoch=10,
         epochs=50,
         lrs=(

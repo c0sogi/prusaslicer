@@ -34,6 +34,13 @@ def get_result_filename(model_name: str, model_config: ANNConfig) -> str:
     return f"./output/{model_name}_E{model_config.epochs}_K{model_config.kfold_splits}.pickle"  # noqa: E501
 
 
+def process_history(hist_history):
+    if "mse" in hist_history:
+        hist_history["rmse"] = np.sqrt(hist_history["mse"]).tolist()
+        hist_history.pop("mse")
+    return hist_history
+
+
 @dataclass
 class Trainer:
     model_class: Type[keras.Sequential]
@@ -99,7 +106,7 @@ class Trainer:
                         self._model_name, model_config, case, kfold_case
                     )
                 )
-                kfold_histories.append(hist.history)
+                kfold_histories.append(process_history(hist.history))
 
             output.update(
                 {
@@ -132,10 +139,7 @@ class Trainer:
             model.save(
                 get_checkpoint_filename(self._model_name, model_config, case)
             )
-            history = hist.history  # type: dict[str, Any]
-            if "mse" in history:
-                history["rmse"] = np.sqrt(history["mse"])
-                history.pop("mse")
+            history = process_history(hist.history)
             output.update(history)
             mean_history = {
                 key: str(np.mean(history[key], axis=0))
