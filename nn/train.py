@@ -9,10 +9,9 @@ from typing import Any, Iterable, Optional, Type
 import numpy as np
 from tensorflow import keras
 
-from .ann import ANN
 from .callbacks import AccuracyPerEpoch
 from .config import ANNConfig
-from .dataloader import dataset_kfold_iterator
+from .dataloader import dataset_kfold_iterator, dump_pickle
 from .logger import ApiLogger
 
 logger = ApiLogger(__name__)
@@ -25,16 +24,14 @@ def get_checkpoint_filename(
     kfold_case: Optional[int] = None,
 ) -> str:
     if kfold_case is None:
-        return f"{model_name}_C{case}of{model_config.number_of_cases}.keras"
-    return f"./output/{model_name}_C{case}of{model_config.number_of_cases}_K{kfold_case}of{model_config.kfold_splits}.keras"  # noqa: E501
+        return f"{model_name}_E{model_config.epochs}_C{case}of{model_config.number_of_cases}.keras"  # noqa: E501
+    return f"./output/{model_name}_E{model_config.epochs}_C{case}of{model_config.number_of_cases}_K{kfold_case}of{model_config.kfold_splits}.keras"  # noqa: E501
 
 
-def get_result_filename(
-    model_name: str, epochs: int, kfold_splits: int
-) -> str:
-    if kfold_splits is None:
-        return f"{model_name}_E{epochs}.json"
-    return f"./output/{model_name}_E{epochs}_K{kfold_splits}.json"
+def get_result_filename(model_name: str, model_config: ANNConfig) -> str:
+    if model_config.kfold_splits <= 0:
+        return f"./output/{model_name}_E{model_config.epochs}.pickle"
+    return f"./output/{model_name}_E{model_config.epochs}_K{model_config.kfold_splits}.pickle"  # noqa: E501
 
 
 @dataclass
@@ -74,7 +71,7 @@ class Trainer:
 
         logger.info(f"Start training: {output}")
         if kfold_splits > 0:
-            kfold_histories: list[dict[str, Any]] = []
+            kfold_histories: list = []
             for kfold_case, (x_train, y_train, x_test, y_test) in enumerate(
                 dataset_kfold_iterator(
                     model_config.train_data,
@@ -102,27 +99,24 @@ class Trainer:
                         self._model_name, model_config, case, kfold_case
                     )
                 )
-                kfold_histories.append(
-                    {
-                        "kfold_case": kfold_case,
-                        **{
-                            metric: hist.history[metric][-1]
-                            for metric in hist.history
-                        },
+                kfold_histories.append(hist.history)
+
+            output.update(
+                {
+                    "kfold": {
+                        kfold_case: kfold_history
+                        for kfold_case, kfold_history in enumerate(
+                            kfold_histories, start=1
+                        )
                     }
-                )
-            output = {
-                **output,
-                "kfold": kfold_histories,
-                "kfold_mean": {
-                    metric: np.mean(
-                        [kfold[metric] for kfold in kfold_histories]
-                    )
-                    for metric in kfold_histories[0]
-                },
+                }
+            )
+            mean_last_history = {
+                key: np.mean(kfold_histories[-1][key], axis=0)
+                for key in kfold_histories[0].keys()
             }
             logger.info(
-                f"End training: {json.dumps(kfold_histories, indent=2)}"
+                f"End training: {json.dumps(mean_last_history, indent=2)}"
             )
         else:
             hist = model.fit(
@@ -138,28 +132,25 @@ class Trainer:
             model.save(
                 get_checkpoint_filename(self._model_name, model_config, case)
             )
-            histories = {
-                metric: hist.history[metric][-1] for metric in hist.history
-            }  # type: dict[str, Any]
-            if "mse" in histories:
-                histories["rmse"] = np.sqrt(histories["mse"])
-                histories.pop("mse")
-            output.update(histories)
-            logger.info(f"End training: {json.dumps(histories, indent=2)}")
+            history = hist.history  # type: dict[str, Any]
+            if "mse" in history:
+                history["rmse"] = np.sqrt(history["mse"])
+                history.pop("mse")
+            output.update(history)
+            mean_history = {
+                key: str(np.mean(history[key], axis=0))
+                for key in history.keys()
+            }
+            logger.info(f"End training: {json.dumps(mean_history, indent=2)}")
         return output
 
     def hyper_train(
-        self,
-        model_class: Type[ANN],
-        model_config: ANNConfig,
-        model_name: Optional[str] = None,
-        hyper_params: Optional[dict[str, Iterable[int | float]]] = None,
+        self, hyper_params: Optional[dict[str, Iterable[int | float]]] = None
     ) -> None:
         hyper_params = hyper_params or {}
-        model_name = model_name or model_class.__name__
         product = tuple(itertools.product(*hyper_params.values()))
         logger.critical(
-            f"model: {model_name} with {model_config.number_of_cases} cases"
+            f"model: {self._model_name} with {self.model_config.number_of_cases} cases"  # noqa: E501
         )
         buffer = []  # type: list[dict[str, Any]]
         for case, combined_hyper_params in enumerate(product, start=1):
@@ -171,8 +162,6 @@ class Trainer:
                     ),
                 )
             )
-        kfold_splits = model_config.kfold_splits
-        epochs = model_config.epochs
-        path = Path(get_result_filename(model_name, epochs, kfold_splits))
-        path.mkdir(exist_ok=True, parents=True)
-        path.write_text(json.dumps(buffer, indent=2))
+        dump_pickle(
+            get_result_filename(self._model_name, self.model_config), buffer
+        )

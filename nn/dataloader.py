@@ -1,7 +1,30 @@
-from typing import Iterator, Tuple
+import json
+import pickle
+from pathlib import Path
+from typing import Any, Iterator, Tuple
 
 import pandas as pd
 from sklearn.model_selection import KFold
+
+
+def dump_pickle(file_path: str, data: Any) -> None:
+    with open(file_path, "wb") as f:
+        pickle.dump(data, f)
+
+
+def load_pickle(file_path: str) -> Any:
+    with open(file_path, "rb") as f:
+        return pickle.load(f)
+
+
+def dump_jsonl(file_path: str, data: list[Any]) -> None:
+    Path(file_path).write_text("\n".join(json.dumps(entry) for entry in data))
+
+
+def load_jsonl(file_path: str) -> list[dict[str, object]]:
+    return [
+        json.loads(line) for line in Path(file_path).read_text().splitlines()
+    ]
 
 
 def dataset_batch_iterator(

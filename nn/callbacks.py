@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 from tensorflow import keras
@@ -29,7 +29,7 @@ class AccuracyPerEpoch(keras.callbacks.Callback):
         )
 
     @staticmethod
-    def print(epoch: int, **kwargs: object) -> None:
+    def print(epoch: int, **kwargs: Any) -> None:
         logger.debug(
             f"[Epoch {epoch:^5}]\t"
             + "\t".join(

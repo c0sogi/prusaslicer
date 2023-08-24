@@ -3,10 +3,12 @@ PRIVATE_*
 *.ini
 *.gcode
 *.json
+*.jsonl
 *.png
 *.log
 *.h5
 *.keras
+*.pickle
 checkpoint/*
 !printer/*
 !template.ini
