@@ -16,7 +16,6 @@ class AccuracyPerEpoch(keras.callbacks.Callback):
     def on_epoch_end(
         self, epoch: int, logs: Optional[dict[str, float]] = None
     ):
-        keras.callbacks.Callback()
         if epoch % self._ppe != 0 or logs is None:
             return
         self.print(
@@ -24,6 +23,9 @@ class AccuracyPerEpoch(keras.callbacks.Callback):
             rsme=np.sqrt(logs["mse"]) if "mse" in logs else None,
             mae=logs["mae"] if "mae" in logs else None,
             mape=logs["mape"] if "mape" in logs else None,
+            val_rsme=np.sqrt(logs["val_mse"]) if "val_mse" in logs else None,
+            val_mae=logs["val_mae"] if "val_mae" in logs else None,
+            val_mape=logs["val_mape"] if "val_mape" in logs else None,
         )
 
     @staticmethod

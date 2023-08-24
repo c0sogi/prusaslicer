@@ -34,6 +34,7 @@ class ANNConfig:
     dim_out: int = 1
     epochs: int = 2000
     batch_size: int = 100
+    kfold_splits: int = 6
 
     # 아래는 자동으로 계산됨
     number_of_cases: int = field(init=False)
