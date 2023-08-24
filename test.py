@@ -1,6 +1,6 @@
 from nn.ann import ANN
 from nn.config import ANNConfig
-from nn.train import hyper_train
+from nn.train import Trainer
 
 if __name__ == "__main__":
     ann_config = ANNConfig(
@@ -10,11 +10,19 @@ if __name__ == "__main__":
         n1s=(60, 70, 80, 90, 100, 110, 120, 130),
         n2s=(50, 60, 70, 80, 90, 100, 110),
     )
-
-    hyper_train(
+    trainer = Trainer(
         ANN,
         ann_config,
-        lrs=ann_config.lrs,
-        n1s=ann_config.n1s,
-        n2s=ann_config.n2s,
+        model_name="test",
+        workers=1,
+        use_multiprocessing=False,
+    )
+    trainer.hyper_train(
+        ANN,
+        ann_config,
+        hyper_params={
+            "lr": ann_config.lrs,
+            "n1": ann_config.n1s,
+            "n2": ann_config.n2s,
+        },
     )
