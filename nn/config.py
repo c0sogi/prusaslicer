@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Literal, get_args
 
 import pandas as pd
 import tensorflow as tf
@@ -7,9 +7,7 @@ from sklearn.preprocessing import MinMaxScaler
 
 from .logger import ApiLogger
 
-InputParams = Literal[
-    "weight", "width1", "width2", "width3", "height", "depth", "strength"
-]
+InputParams = Literal["bedtemp", "exttemp", "layerthickness", "infillspeed"]
 
 OutputParams = Literal[
     "weight", "width1", "width2", "width3", "height", "depth", "strength"
@@ -60,9 +58,8 @@ class ANNConfig:
         tf.random.set_seed(self.seed)
         df = pd.read_csv(self.csv_path, header=None)
 
-        # 첫 번째 행을 기반으로 X, Y 변수 구분
-        x_slice = df.loc[1, df.iloc[0] == "X"].tolist()  # type: ignore
-        y_slice = df.loc[1, df.iloc[0] == "Y"].tolist()  # type: ignore
+        x_indices: pd.Index = df.columns[df.iloc[0] == "X"] - 1
+        y_indices: pd.Index = df.columns[df.iloc[0] == "Y"] - 1
 
         # 두 번째 행을 기반으로 열 이름 설정
         df.columns = ["Name"] + df.iloc[1].tolist()[1:]
@@ -72,8 +69,8 @@ class ANNConfig:
         df.set_index("Name", inplace=True)
 
         # Input 및 Output DataFrame으로 분리
-        self.input_data = df[x_slice]
-        self.output_data = df[y_slice]
+        self.input_data = df.iloc[:, x_indices]
+        self.output_data = df.iloc[:, y_indices]
 
         logger.debug(
             f"===== Input Data: {self.input_data.shape} =====\n{self.input_data.head(3)}"  # noqa: E501
@@ -90,8 +87,15 @@ class ANNConfig:
         self.number_of_outputs = self.output_data.shape[1]
         self.input_data = self.input_data
         self.output_data = self.output_data
-        self.input_column_names = self.input_data.columns.tolist()
-        self.output_column_names = self.output_data.columns.tolist()
+        x_columns: list[InputParams] = self.input_data.columns.tolist()  # type: ignore  # noqa: E501
+        y_columns: list[OutputParams] = self.output_data.columns.tolist()  # type: ignore  # noqa: E501
+        x_params = list(get_args(InputParams))
+        y_params = list(get_args(OutputParams))
+        assert isinstance(x_columns, list) and isinstance(y_columns, list)
+        assert set(x_params) == set(x_columns), f"{x_columns} != {x_params}"
+        assert set(y_params) == set(y_columns), f"{y_columns} != {y_params}"
+        self.input_column_names = x_columns
+        self.output_column_names = y_columns
         self.number_of_cases = len(self.lrs) * len(self.n1s) * len(self.n2s)
 
         # 최대/최소값 계산
@@ -110,10 +114,10 @@ class ANNConfig:
             ),
         ):
             for column_name in column_names:
-                max_values[column_name] = data[column_name].max()
-                min_values[column_name] = data[column_name].min()
+                max_values[column_name] = data[column_name].max()  # type: ignore  # noqa: E501
+                min_values[column_name] = data[column_name].min()  # type: ignore  # noqa: E501
                 logger.debug(
-                    f"{column_name}: {min_values[column_name]} ~ {max_values[column_name]}"  # noqa: E501
+                    f"{column_name}: {min_values[column_name]} ~ {max_values[column_name]}"  # type: ignore  # noqa: E501
                 )
         scaler = MinMaxScaler()
         scaler.fit(self.input_data)

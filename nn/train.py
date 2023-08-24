@@ -2,9 +2,10 @@ import itertools
 from inspect import signature
 import json
 from pathlib import Path
-from typing import Any, Iterable, Optional, Type
+from typing import Any, Iterable, Iterator, Optional, Tuple, Type
 
 import numpy as np
+import pandas as pd
 from tensorflow import keras
 
 from .ann import ANN
@@ -81,3 +82,12 @@ def hyper_train(
     (path / f"{model_name}_epochs_{model_config.epochs}.json").write_text(
         json.dumps(buffer, indent=2)
     )
+
+
+def dataset_iterator(
+    x_data: pd.DataFrame, y_data: pd.DataFrame, batch_size: int = 1
+) -> Iterator[Tuple[pd.DataFrame, pd.DataFrame]]:
+    dataset_size = min(len(x_data), len(y_data))
+    for batch_start in range(0, dataset_size, batch_size):
+        batch_end = min(dataset_size, batch_start + batch_size)
+        yield x_data[batch_start:batch_end], y_data[batch_start:batch_end]
