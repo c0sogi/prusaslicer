@@ -22,7 +22,7 @@ from tensorflow import keras
 
 from .callbacks import AccuracyPerEpoch, EarlyStopping
 from .config import ANNConfig
-from .dataloader import dataset_kfold_iterator, dump_pickle
+from .dataloader import dataset_kfold_iterator, dump_pickle, load_pickle
 from .logger import ApiLogger
 
 logger = ApiLogger(__name__)
@@ -113,9 +113,17 @@ class Trainer:
         kfold_case: Optional[int] = None,
         val_split: Optional[float] = 0.1,
     ) -> PickleHistory:
+        filename = self.get_filename_without_ext(case, kfold_case)
+        if (
+            Path(filename + ".keras").exists()
+            and Path(filename + ".pickle").exists()
+        ):
+            logger.critical(f"Skip training: {filename}")
+            return load_pickle(filename + ".pickle")
         keras.backend.clear_session()
         model = self.create_model(hyper_params)
         model_config = self.model_config
+
         pickle_history: PickleHistory = PickleHistory(
             train_input=TrainInput(
                 case=case, hyper_params=hyper_params or {}, config=model_config
@@ -148,7 +156,6 @@ class Trainer:
         }
 
         logger.info(f"End training: {json.dumps(history_mean, indent=2)}")
-        filename = self.get_filename_without_ext(case, kfold_case)
         model.save(filename + ".keras")
         dump_pickle(filename + ".pickle", pickle_history)
         return pickle_history

@@ -11,7 +11,7 @@ services:
     ports:
       - 8888:8888
     environment:
-      - JUPYTER_TOKEN=sdml
+      - JUPYTER_TOKEN=
     deploy:
       resources:
         reservations:
