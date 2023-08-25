@@ -1,0 +1,20 @@
+version: "3.8"
+
+services:
+  sdml:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /tf
+    volumes:
+      - .:/tf
+    ports:
+      - 8888:8888
+    environment:
+      - JUPYTER_TOKEN=sdml
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            capabilities: [gpu]

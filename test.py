@@ -5,11 +5,12 @@ from nn.train import Trainer
 if __name__ == "__main__":
     ann_config = ANNConfig(
         kfold_splits=0,
-        print_per_epoch=2,
-        epochs=10,
-        lrs=(0.001,),
+        print_per_epoch=1000,
+        epochs=10000,
+        patience=1000,
+        lrs=(0.001, 0.005, 0.01),
         n1s=(60, 70),
-        n2s=(50,),
+        n2s=(50, 60, 70, 80, 90, 100, 110),
     )
     trainer = Trainer(
         ANN,

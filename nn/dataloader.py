@@ -1,7 +1,7 @@
 import json
 import pickle
 from pathlib import Path
-from typing import Any, Iterator, Tuple
+from typing import Any, Dict, Iterator, List, Tuple
 
 import pandas as pd
 from sklearn.model_selection import KFold
@@ -17,11 +17,11 @@ def load_pickle(file_path: str) -> Any:
         return pickle.load(f)
 
 
-def dump_jsonl(file_path: str, data: list[Any]) -> None:
+def dump_jsonl(file_path: str, data: List[Any]) -> None:
     Path(file_path).write_text("\n".join(json.dumps(entry) for entry in data))
 
 
-def load_jsonl(file_path: str) -> list[dict[str, object]]:
+def load_jsonl(file_path: str) -> List[Dict[str, object]]:
     return [
         json.loads(line) for line in Path(file_path).read_text().splitlines()
     ]

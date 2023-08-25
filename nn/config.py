@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Literal, get_args
+from typing import Dict, List, Literal, Tuple, get_args
 
 import pandas as pd
 import tensorflow as tf
@@ -22,12 +22,12 @@ class ANNConfig:
     seed: int = 777
     print_per_epoch: int = 100
     csv_path: str = "raw_data.csv"
-    metrics: list[str] = field(default_factory=lambda: ["mse", "mae", "mape"])
+    metrics: List[str] = field(default_factory=lambda: ["mse", "mae", "mape"])
 
     # 하이퍼 파라미터
-    lrs: tuple[float, ...] = (0.001, 0.005, 0.01)  # Learning Rates
-    n1s: tuple[int, ...] = (60, 70, 80, 90, 100, 110, 120, 130)
-    n2s: tuple[int, ...] = (50, 60, 70, 80, 90, 100, 110)
+    lrs: Tuple[float, ...] = (0.001, 0.005, 0.01)  # Learning Rates
+    n1s: Tuple[int, ...] = (60, 70, 80, 90, 100, 110, 120, 130)
+    n2s: Tuple[int, ...] = (50, 60, 70, 80, 90, 100, 110)
 
     # 고정 하이퍼파라미터 : 입력/출력층 뉴런 수, 학습 Epoch 수
     dim_in: int = 50
@@ -35,25 +35,34 @@ class ANNConfig:
     epochs: int = 2000
     batch_size: int = 100
     kfold_splits: int = 6
+    patience: int = 1000
 
     # 아래는 자동으로 계산됨
-    number_of_cases: int = field(init=False)
-    number_of_experiments: int = field(init=False)
-    number_of_inputs: int = field(init=False)
-    number_of_outputs: int = field(init=False)
+    number_of_cases: int = field(init=False, repr=False)
+    number_of_experiments: int = field(init=False, repr=False)
+    number_of_inputs: int = field(init=False, repr=False)
+    number_of_outputs: int = field(init=False, repr=False)
 
-    input_data: pd.DataFrame = field(init=False)
-    output_data: pd.DataFrame = field(init=False)
-    train_data: pd.DataFrame = field(init=False)
-    train_label: pd.DataFrame = field(init=False)
+    input_data: pd.DataFrame = field(init=False, repr=False)
+    output_data: pd.DataFrame = field(init=False, repr=False)
+    train_data: pd.DataFrame = field(init=False, repr=False)
+    train_label: pd.DataFrame = field(init=False, repr=False)
 
-    input_column_names: list[InputParams] = field(init=False)
-    output_column_names: list[OutputParams] = field(init=False)
+    input_column_names: List[InputParams] = field(init=False, repr=False)
+    output_column_names: List[OutputParams] = field(init=False, repr=False)
 
-    max_input_values: dict[InputParams, float] = field(default_factory=dict)
-    min_input_values: dict[InputParams, float] = field(default_factory=dict)
-    max_output_values: dict[OutputParams, float] = field(default_factory=dict)
-    min_output_values: dict[OutputParams, float] = field(default_factory=dict)
+    max_input_values: Dict[InputParams, float] = field(
+        default_factory=dict, repr=False
+    )
+    min_input_values: Dict[InputParams, float] = field(
+        default_factory=dict, repr=False
+    )
+    max_output_values: Dict[OutputParams, float] = field(
+        default_factory=dict, repr=False
+    )
+    min_output_values: Dict[OutputParams, float] = field(
+        default_factory=dict, repr=False
+    )
 
     def __post_init__(self) -> None:
         tf.random.set_seed(self.seed)
@@ -88,8 +97,8 @@ class ANNConfig:
         self.number_of_outputs = self.output_data.shape[1]
         self.input_data = self.input_data
         self.output_data = self.output_data
-        x_columns: list[InputParams] = self.input_data.columns.tolist()  # type: ignore  # noqa: E501
-        y_columns: list[OutputParams] = self.output_data.columns.tolist()  # type: ignore  # noqa: E501
+        x_columns: List[InputParams] = self.input_data.columns.tolist()  # type: ignore  # noqa: E501
+        y_columns: List[OutputParams] = self.output_data.columns.tolist()  # type: ignore  # noqa: E501
         x_params = list(get_args(InputParams))
         y_params = list(get_args(OutputParams))
         assert isinstance(x_columns, list) and isinstance(y_columns, list)
