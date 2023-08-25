@@ -4,14 +4,11 @@ from nn.train import Trainer
 
 if __name__ == "__main__":
     ann_config = ANNConfig(
-        kfold_splits=2,
-        print_per_epoch=10,
-        epochs=50,
-        lrs=(
-            0.001,
-            0.005,
-        ),
-        n1s=(60,),
+        kfold_splits=0,
+        print_per_epoch=2,
+        epochs=10,
+        lrs=(0.001,),
+        n1s=(60, 70),
         n2s=(50,),
     )
     trainer = Trainer(
