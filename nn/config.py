@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Dict, List, Literal, Tuple, get_args
+from typing import Dict, List, Literal, get_args
 
 import pandas as pd
 import tensorflow as tf
@@ -17,17 +17,13 @@ logger = ApiLogger(__name__)
 
 
 @dataclass
-class ANNConfig:
+class ModelConfig:
     # 기본 설정
     seed: int = 777
     print_per_epoch: int = 100
-    csv_path: str = "raw_data.csv"
+    input_path: str = "./raw_data.csv"
+    output_path: str = "./output"
     metrics: List[str] = field(default_factory=lambda: ["mse", "mae", "mape"])
-
-    # 하이퍼 파라미터
-    lrs: Tuple[float, ...] = (0.001, 0.005, 0.01)  # Learning Rates
-    n1s: Tuple[int, ...] = (60, 70, 80, 90, 100, 110, 120, 130)
-    n2s: Tuple[int, ...] = (50, 60, 70, 80, 90, 100, 110)
 
     # 고정 하이퍼파라미터 : 입력/출력층 뉴런 수, 학습 Epoch 수
     dim_in: int = 50
@@ -38,7 +34,6 @@ class ANNConfig:
     patience: int = 1000
 
     # 아래는 자동으로 계산됨
-    number_of_cases: int = field(init=False, repr=False)
     number_of_experiments: int = field(init=False, repr=False)
     number_of_inputs: int = field(init=False, repr=False)
     number_of_outputs: int = field(init=False, repr=False)
@@ -52,21 +47,21 @@ class ANNConfig:
     output_column_names: List[OutputParams] = field(init=False, repr=False)
 
     max_input_values: Dict[InputParams, float] = field(
-        default_factory=dict, repr=False
+        default_factory=dict, repr=False, init=False
     )
     min_input_values: Dict[InputParams, float] = field(
-        default_factory=dict, repr=False
+        default_factory=dict, repr=False, init=False
     )
     max_output_values: Dict[OutputParams, float] = field(
-        default_factory=dict, repr=False
+        default_factory=dict, repr=False, init=False
     )
     min_output_values: Dict[OutputParams, float] = field(
-        default_factory=dict, repr=False
+        default_factory=dict, repr=False, init=False
     )
 
     def __post_init__(self) -> None:
         tf.random.set_seed(self.seed)
-        df = pd.read_csv(self.csv_path, header=None)
+        df = pd.read_csv(self.input_path, header=None)
 
         x_indices: pd.Index = df.columns[df.iloc[0] == "X"] - 1
         y_indices: pd.Index = df.columns[df.iloc[0] == "Y"] - 1
@@ -106,7 +101,6 @@ class ANNConfig:
         assert set(y_params) == set(y_columns), f"{y_columns} != {y_params}"
         self.input_column_names = x_columns
         self.output_column_names = y_columns
-        self.number_of_cases = len(self.lrs) * len(self.n1s) * len(self.n2s)
 
         # 최대/최소값 계산
         for data, column_names, max_values, min_values in (

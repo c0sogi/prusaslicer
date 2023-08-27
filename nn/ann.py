@@ -2,13 +2,13 @@ from typing import Optional
 import numpy as np
 from tensorflow import keras
 
-from .config import ANNConfig
+from .config import ModelConfig
 
 
 class ANN(keras.Sequential):
     def __init__(
         self,
-        model_config: Optional[ANNConfig] = None,
+        model_config: Optional[ModelConfig] = None,
         n1: Optional[int] = None,
         n2: Optional[int] = None,
         lr: Optional[float] = None,
