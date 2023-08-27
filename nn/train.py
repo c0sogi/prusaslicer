@@ -4,16 +4,8 @@ import multiprocessing
 from dataclasses import dataclass
 from inspect import signature
 from pathlib import Path
-from typing import (
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Tuple,
-    Type,
-    TypedDict,
-    Union,
-)
+from typing import (Any, Dict, Iterable, List, Optional, Tuple, Type,
+                    TypedDict, Union)
 
 import numpy as np
 import pandas as pd
@@ -23,7 +15,7 @@ from tensorflow import keras
 from .callbacks import AccuracyPerEpoch, EarlyStopping
 from .config import ANNConfig
 from .dataloader import dataset_kfold_iterator, dump_pickle, load_pickle
-from .logger import ApiLogger
+from .utils.logger import ApiLogger
 
 logger = ApiLogger(__name__)
 
@@ -144,8 +136,6 @@ class Trainer:
             verbose=0,  # type: ignore
             callbacks=self.create_callbacks(),
             batch_size=model_config.batch_size,
-            use_multiprocessing=self.use_multiprocessing,
-            workers=self.workers,
             validation_data=validation_data,
         )
 
@@ -160,6 +150,10 @@ class Trainer:
         dump_pickle(filename + ".pickle", pickle_history)
         return pickle_history
 
+    def parallel_train(self, case_hyper_params: Tuple[int, Dict[str, Any]]):
+        case, hyper_params = case_hyper_params
+        return self.train(case, hyper_params)
+
     def hyper_train(
         self,
         hyper_params: Optional[Dict[str, Iterable[Union[int, float]]]] = None,
@@ -169,15 +163,28 @@ class Trainer:
         logger.critical(
             f"model: {self._model_name} with {self.model_config.number_of_cases} cases"  # noqa: E501
         )
+        case_hyper_params_list = [
+            (case, dict(zip(hyper_params, combined_hyper_params)))
+            for case, combined_hyper_params in enumerate(product, start=1)
+        ]
+
+        with multiprocessing.Pool(processes=self.workers) as pool:
+            results = pool.map(self.parallel_train, case_hyper_params_list)
+
         pickled_histories = []  # type: List[PickleHistory]
-        for case, combined_hyper_params in enumerate(product, start=1):
-            train_result = self.train(
-                case,
-                hyper_params=dict(zip(hyper_params, combined_hyper_params)),
-            )
-            pickled_histories.extend(train_result) if isinstance(
-                train_result, list
-            ) else pickled_histories.append(train_result)
+        for result in results:
+            if isinstance(result, list):
+                pickled_histories.extend(result)
+            else:
+                pickled_histories.append(result)
+        # for case, combined_hyper_params in enumerate(product, start=1):
+        #     train_result = self.train(
+        #         case,
+        #         hyper_params=dict(zip(hyper_params, combined_hyper_params)),
+        #     )
+        #     pickled_histories.extend(train_result) if isinstance(
+        #         train_result, list
+        #     ) else pickled_histories.append(train_result)
         dump_pickle(
             self.get_filename_without_ext() + ".pickle", pickled_histories
         )

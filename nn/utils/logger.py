@@ -17,7 +17,7 @@ class LoggingConfig:
     file_log_level: Optional[int] = logging.INFO
     file_log_name: Optional[
         str
-    ] = f"./logs/debug-{datetime.now():%y%m%d-%H%M}.log"
+    ] = f"./logs/debug-{datetime.now():%y%m%d}.log"
     logging_format: str = "[%(asctime)s] %(name)s:%(levelname)s - %(message)s"
     color: bool = True
 

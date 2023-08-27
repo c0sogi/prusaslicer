@@ -3,7 +3,7 @@ from typing import Any, Dict, Optional
 import numpy as np
 from tensorflow import keras
 
-from .logger import ApiLogger
+from .utils.logger import ApiLogger
 
 logger = ApiLogger(__name__)
 

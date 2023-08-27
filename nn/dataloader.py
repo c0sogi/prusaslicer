@@ -1,27 +1,29 @@
 import json
 import pickle
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Tuple
+from typing import Any, Dict, Iterator, List, Tuple, Union
 
 import pandas as pd
 from sklearn.model_selection import KFold
 
+PathLike = Union[str, Path]
 
-def dump_pickle(file_path: str, data: Any) -> None:
+
+def dump_pickle(file_path: PathLike, data: Any) -> None:
     with open(file_path, "wb") as f:
         pickle.dump(data, f)
 
 
-def load_pickle(file_path: str) -> Any:
+def load_pickle(file_path: PathLike) -> Any:
     with open(file_path, "rb") as f:
         return pickle.load(f)
 
 
-def dump_jsonl(file_path: str, data: List[Any]) -> None:
+def dump_jsonl(file_path: PathLike, data: List[Any]) -> None:
     Path(file_path).write_text("\n".join(json.dumps(entry) for entry in data))
 
 
-def load_jsonl(file_path: str) -> List[Dict[str, object]]:
+def load_jsonl(file_path: PathLike) -> List[Dict[str, object]]:
     return [
         json.loads(line) for line in Path(file_path).read_text().splitlines()
     ]

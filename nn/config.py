@@ -5,7 +5,7 @@ import pandas as pd
 import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler
 
-from .logger import ApiLogger
+from .utils.logger import ApiLogger
 
 InputParams = Literal["bedtemp", "exttemp", "layerthickness", "infillspeed"]
 
