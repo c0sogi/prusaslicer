@@ -24,9 +24,7 @@ def dump_jsonl(file_path: PathLike, data: List[Any]) -> None:
 
 
 def load_jsonl(file_path: PathLike) -> List[Dict[str, object]]:
-    return [
-        json.loads(line) for line in Path(file_path).read_text().splitlines()
-    ]
+    return [json.loads(line) for line in Path(file_path).read_text().splitlines()]
 
 
 def dataset_batch_iterator(

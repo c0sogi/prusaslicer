@@ -30,6 +30,7 @@ logger = ApiLogger(__name__)
 
 HyperParamValue = Union[int, float]
 HyperParamsDict = Dict[str, HyperParamValue]
+HyperParamsDictAll = Dict[str, Iterable[HyperParamValue]]
 
 
 class TrainInput(TypedDict):
@@ -39,8 +40,7 @@ class TrainInput(TypedDict):
 
 class PickleHistory(TypedDict):
     train_input: TrainInput
-    train_output: Union[List, Dict]
-
+    train_output: List
 
 @dataclass
 class Trainer:
@@ -159,28 +159,25 @@ class Trainer:
 
     def hyper_train(
         self,
-        multiple_hyper_params: Optional[
-            Dict[str, Iterable[HyperParamValue]]
-        ] = None,
+        all_hyper_params: Optional[HyperParamsDictAll] = None,
     ) -> None:
-        multiple_hyper_params = multiple_hyper_params or {}
-        product = tuple(itertools.product(*multiple_hyper_params.values()))
+        all_hyper_params = all_hyper_params or {}
+        product = tuple(itertools.product(*all_hyper_params.values()))
         logger.critical(
             f"model: {self._model_name} with {len(product)} cases"  # noqa: E501
         )
-
-        with multiprocessing.Pool(processes=self.workers) as pool:
-            results = pool.map(
-                self.train,
-                [
-                    dict(
-                        zip(
-                            multiple_hyper_params.keys(), combined_hyper_params
-                        )
-                    )
-                    for combined_hyper_params in product
-                ],
-            )
+        product_hyper_params = [
+            dict(zip(all_hyper_params.keys(), combined_hyper_params))
+            for combined_hyper_params in product
+        ]
+        if self.use_multiprocessing:
+            with multiprocessing.Pool(processes=self.workers) as pool:
+                results = pool.map(self.train, product_hyper_params)
+        else:
+            results = [
+                self.train(hyper_params=hyper_param)
+                for hyper_param in product_hyper_params
+            ]
 
         pickled_histories = []  # type: List[PickleHistory]
         for result in results:
@@ -197,7 +194,7 @@ class Trainer:
     def create_callbacks(self) -> List[keras.callbacks.Callback]:
         return [
             AccuracyPerEpoch(
-                print_per_epoch=self.model_config.print_per_epoch
+                print_per_epoch=self.model_config.print_per_epoch,
             ),
             EarlyStopping(patience=self.model_config.patience),
         ]

@@ -53,10 +53,7 @@ def visualize_normalized(
 
     # Normalize function
     def normalize(values):
-        return [
-            (value - min(values)) / (max(values) - min(values))
-            for value in values
-        ]
+        return [(value - min(values)) / (max(values) - min(values)) for value in values]
 
     # Normalize the metrics
     normalized_mae = normalize(mae_values)
@@ -89,9 +86,7 @@ def visualize_normalized(
     plt.show()
 
 
-def select_top_cases(
-    data: List[Dict[str, Any]], n: int = 1
-) -> List[Dict[str, Any]]:
+def select_top_cases(data: List[Dict[str, Any]], n: int = 1) -> List[Dict[str, Any]]:
     """
     Selects the top n cases with the lowest average normalized metric values.
 
@@ -105,10 +100,7 @@ def select_top_cases(
 
     # Normalize function
     def normalize(values):
-        return [
-            (value - min(values)) / (max(values) - min(values))
-            for value in values
-        ]
+        return [(value - min(values)) / (max(values) - min(values)) for value in values]
 
     # Extracting and normalizing the metric values
     mae_values = [item["mae"] for item in data]
@@ -139,3 +131,25 @@ def select_top_cases(
 
     # Return the top n cases
     return sorted_cases[:n]
+
+# Function to plot graphs
+def plot_graphs(data_list):
+    for metric in ['loss', 'mae', 'mape', 'val_loss', 'val_mse', 'val_mae', 'val_mape', 'rmse']:
+        plt.figure(figsize=(12, 6))
+        plt.title(f"{metric} vs Hyperparameters")
+        plt.xlabel("Hyperparameters")
+        plt.ylabel(metric)
+        
+        for data in data_list:
+            hyper_params = data['train_input']['hyper_params']
+            output_metrics = data['train_output']
+            if metric in output_metrics:
+                last_metric_value = output_metrics[metric][-1]  # Using the last value of the list
+                hyper_params_str = ', '.join(f"{k}={v}" for k, v in hyper_params.items())
+                plt.bar(hyper_params_str, last_metric_value, label=hyper_params_str)
+        
+        plt.xticks(rotation=90)
+        plt.legend()
+        plt.show()
+
+plot_graphs(data_list)

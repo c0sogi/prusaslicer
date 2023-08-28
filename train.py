@@ -25,10 +25,13 @@ if __name__ == "__main__":
         use_multiprocessing=True,
     )
     trainer.hyper_train(
-        multiple_hyper_params={
-            "lr": (0.001, ),
-            "n1": (60, 70,),
-            "n2": (50, ),
+        all_hyper_params={
+            "lr": (0.001,),
+            "n1": (
+                60,
+                70,
+            ),
+            "n2": (50,),
         },
     )
     # trainer.train(hyper_params={"lr": 0.001, "n1": 60, "n2": 50})

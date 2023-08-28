@@ -105,9 +105,7 @@ class Trainer:
                 if loss_val < self._best_loss_val:
                     self._best_loss_val = loss_val
                     self.save_checkpoint()
-                logger.info(
-                    f"Epoch [{self._epochs}/{max_epoch}], Loss: {loss_val:.4f}"
-                )
+                logger.info(f"Epoch [{self._epochs}/{max_epoch}], Loss: {loss_val:.4f}")
 
     def save_checkpoint(self) -> None:
         """Save the model checkpoint."""

@@ -84,9 +84,7 @@ class ModelConfig:
             f"===== Output Data: {self.output_data.shape} =====\n{self.output_data.head(3)}"  # noqa: E501
         )
 
-        assert (
-            self.input_data.shape[0] == self.output_data.shape[0]
-        ), "데이터 개수 불일치"
+        assert self.input_data.shape[0] == self.output_data.shape[0], "데이터 개수 불일치"
         self.number_of_experiments = self.input_data.shape[0]
         self.number_of_inputs = self.input_data.shape[1]
         self.number_of_outputs = self.output_data.shape[1]
@@ -125,12 +123,8 @@ class ModelConfig:
                 )
         scaler = MinMaxScaler()
         scaler.fit(self.input_data)
-        self.train_data = pd.DataFrame(
-            scaler.transform(self.input_data), dtype=float
-        )
-        self.train_label = pd.DataFrame(
-            self.get_output_data("strength"), dtype=float
-        )
+        self.train_data = pd.DataFrame(scaler.transform(self.input_data), dtype=float)
+        self.train_label = pd.DataFrame(self.get_output_data("strength"), dtype=float)
 
     def get_input_data(self, column_name: InputParams) -> pd.Series:
         return self.input_data[column_name]

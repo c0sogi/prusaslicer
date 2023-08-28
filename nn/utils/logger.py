@@ -15,9 +15,7 @@ class LoggingConfig:
     logger_level: int = logging.DEBUG
     console_log_level: int = logging.DEBUG
     file_log_level: Optional[int] = logging.INFO
-    file_log_name: Optional[
-        str
-    ] = f"./logs/debug-{datetime.now():%y%m%d}.log"
+    file_log_name: Optional[str] = f"./logs/debug-{datetime.now():%y%m%d}.log"
     logging_format: str = "[%(asctime)s] %(name)s:%(levelname)s - %(message)s"
     color: bool = True
 
@@ -71,9 +69,7 @@ class ApiLogger(logging.Logger):
             logging_config.file_log_name is not None
             and logging_config.file_log_level is not None
         ):
-            Path(logging_config.file_log_name).parent.mkdir(
-                parents=True, exist_ok=True
-            )
+            Path(logging_config.file_log_name).parent.mkdir(parents=True, exist_ok=True)
             file_handler = logging.FileHandler(
                 filename=logging_config.file_log_name,
                 mode="a",
@@ -98,41 +94,31 @@ class ApiLogger(logging.Logger):
     def cdebug(cls, msg: object, *args, **kwargs) -> None:
         if cls.__name__ not in cls._instances:
             cls(cls.__name__)
-        super(ApiLogger, cls._instances[cls.__name__]).debug(
-            msg, *args, **kwargs
-        )
+        super(ApiLogger, cls._instances[cls.__name__]).debug(msg, *args, **kwargs)
 
     @classmethod
     def cwarning(cls, msg: object, *args, **kwargs) -> None:
         if cls.__name__ not in cls._instances:
             cls(cls.__name__)
-        super(ApiLogger, cls._instances[cls.__name__]).warning(
-            msg, *args, **kwargs
-        )
+        super(ApiLogger, cls._instances[cls.__name__]).warning(msg, *args, **kwargs)
 
     @classmethod
     def cerror(cls, msg: object, *args, **kwargs) -> None:
         if cls.__name__ not in cls._instances:
             cls(cls.__name__)
-        super(ApiLogger, cls._instances[cls.__name__]).error(
-            msg, *args, **kwargs
-        )
+        super(ApiLogger, cls._instances[cls.__name__]).error(msg, *args, **kwargs)
 
     @classmethod
     def cexception(cls, msg: object, *args, **kwargs) -> None:
         if cls.__name__ not in cls._instances:
             cls(cls.__name__)
-        super(ApiLogger, cls._instances[cls.__name__]).exception(
-            msg, *args, **kwargs
-        )
+        super(ApiLogger, cls._instances[cls.__name__]).exception(msg, *args, **kwargs)
 
     @classmethod
     def ccritical(cls, msg: object, *args, **kwargs) -> None:
         if cls.__name__ not in cls._instances:
             cls(cls.__name__)
-        super(ApiLogger, cls._instances[cls.__name__]).critical(
-            msg, *args, **kwargs
-        )
+        super(ApiLogger, cls._instances[cls.__name__]).critical(msg, *args, **kwargs)
 
     @contextmanager
     def log_any_error(

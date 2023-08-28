@@ -185,9 +185,7 @@ def export_settings(
     return new_file_path
 
 
-def combine_configs(
-    config: Dict[str, List[str]], folder_name: str
-) -> List[str]:
+def combine_configs(config: Dict[str, List[str]], folder_name: str) -> List[str]:
     config_values: List[List[str]] = [config[key] for key in config]
     combinations: Tuple[Tuple[str]] = tuple(product(*config_values))
     print(f"- Total number of combinations: {len(combinations)}")
@@ -195,9 +193,7 @@ def combine_configs(
     combined_files: List[str] = []
     folder = Path(folder_name)
     for combination in combinations:
-        combined_name = (
-            "_".join([Path(item).stem for item in combination]) + ".ini"
-        )
+        combined_name = "_".join([Path(item).stem for item in combination]) + ".ini"
         combined_content = ""
         for file_path in combination:
             with open(file_path, "r") as file:
@@ -256,9 +252,7 @@ if __name__ == "__main__":
     folder_name = "printer"
     config[folder_name] = []
     setting = PrinterSettings(start_gcode=START_GCODE)
-    config[folder_name].append(
-        export_settings(setting, folder_name, setting.filename)
-    )
+    config[folder_name].append(export_settings(setting, folder_name, setting.filename))
 
     # 필라멘트
     folder_name = "filament"
@@ -291,9 +285,7 @@ if __name__ == "__main__":
             layer_thickness=layer_thickness,
             infill_speed=infill_speed,
         )
-        for layer_thickness, infill_speed in product(
-            LAYER_THICKNESSES, INFILL_SPEEDS
-        )
+        for layer_thickness, infill_speed in product(LAYER_THICKNESSES, INFILL_SPEEDS)
     ):
         config[folder_name].append(
             export_settings(setting, folder_name, template_filename)

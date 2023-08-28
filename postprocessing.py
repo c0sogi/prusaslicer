@@ -70,9 +70,7 @@ def validate_value(value: Any) -> Union[str, int, float, timedelta]:
     return _value
 
 
-def parse_gcode_file(
-    paths: Generator[Path, None, None]
-) -> Dict[str, Dict[str, Any]]:
+def parse_gcode_file(paths: Generator[Path, None, None]) -> Dict[str, Dict[str, Any]]:
     result = {}  # type: Dict[str, Dict[str, Any]]
 
     # 값 추출을 위한 정규식 패턴을 정의합니다.
@@ -108,8 +106,7 @@ def plot_matrix(
     y_values = sorted(list(set([item[y_label] for item in data_list])))
 
     matrix = [
-        [float("-inf") for _ in range(len(y_values))]
-        for _ in range(len(x_values))
+        [float("-inf") for _ in range(len(y_values))] for _ in range(len(x_values))
     ]
 
     for item in data_list:
@@ -157,9 +154,7 @@ if __name__ == "__main__":
     data = parse_gcode_file(Path("gcode").glob("*.gcode"))
     interested_data = {
         filename: {
-            key: value
-            for key, value in kv_dict.items()
-            if key in KEYS_OF_INTEREST
+            key: value for key, value in kv_dict.items() if key in KEYS_OF_INTEREST
         }
         for filename, kv_dict in data.items()
     }
@@ -182,9 +177,7 @@ if __name__ == "__main__":
     data_list = [
         {**{"filename": filename}, **kv_dict}
         for filename, kv_dict in {
-            filename: {
-                key: validate_value(value) for key, value in kv_dict.items()
-            }
+            filename: {key: validate_value(value) for key, value in kv_dict.items()}
             for filename, kv_dict in data.items()
         }.items()
     ]
