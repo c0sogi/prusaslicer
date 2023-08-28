@@ -9,6 +9,7 @@ class ANN(keras.Sequential):
     def __init__(
         self,
         model_config: Optional[ModelConfig] = None,
+        n0: Optional[int] = None,
         n1: Optional[int] = None,
         n2: Optional[int] = None,
         lr: Optional[float] = None,
@@ -25,8 +26,8 @@ class ANN(keras.Sequential):
             self.optimizer = keras.optimizers.Adam(learning_rate=lr)
             self.add(
                 keras.layers.Dense(
-                    units=model_config.dim_in,
-                    input_shape=(model_config.train_data.shape[1],),
+                    units=n0,
+                    input_shape=(model_config.dim_in,),
                     activation=activation,
                 )
             )

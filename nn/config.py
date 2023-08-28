@@ -26,7 +26,7 @@ class ModelConfig:
     metrics: List[str] = field(default_factory=lambda: ["mse", "mae", "mape"])
 
     # 고정 하이퍼파라미터 : 입력/출력층 뉴런 수, 학습 Epoch 수
-    dim_in: int = 50
+    dim_in: int = len(get_args(InputParams))
     dim_out: int = 1
     epochs: int = 2000
     batch_size: int = 100
