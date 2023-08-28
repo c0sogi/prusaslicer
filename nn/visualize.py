@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Union
 from matplotlib import pyplot as plt
 import numpy as np
 
+from .dataloader import load_pickle
 from .train import PickleHistory
 
 
@@ -166,8 +167,6 @@ def plot_graphs(pickle_path: Union[str, Path]):
 
 
 if __name__ == "__main__":
-    from .dataloader import load_pickle
-
     for pickle_path in Path("output").glob("*.pickle"):
         if "[" in pickle_path.name and "]" in pickle_path.name:
             continue
