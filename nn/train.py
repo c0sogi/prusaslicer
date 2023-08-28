@@ -1,3 +1,4 @@
+# flake8: noqa
 from datetime import datetime
 import itertools
 import json
@@ -20,6 +21,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from tensorflow import keras
+from typing_extensions import NotRequired
 
 from .callbacks import AccuracyPerEpoch, EarlyStopping
 from .config import ModelConfig
@@ -38,9 +40,21 @@ class TrainInput(TypedDict):
     config: ModelConfig
 
 
+class TrainOutput(TypedDict):
+    loss: NotRequired[List[float]]
+    mae: NotRequired[List[float]]
+    mape: NotRequired[List[float]]
+    val_loss: NotRequired[List[float]]
+    val_mse: NotRequired[List[float]]
+    val_mae: NotRequired[List[float]]
+    val_mape: NotRequired[List[float]]
+    rmse: NotRequired[List[float]]
+
+
 class PickleHistory(TypedDict):
     train_input: TrainInput
-    train_output: List
+    train_output: TrainOutput
+
 
 @dataclass
 class Trainer:
@@ -106,10 +120,7 @@ class Trainer:
             hyper_params=hyper_params,
             kfold_case=kfold_case,
         )
-        if (
-            Path(filename + ".keras").exists()
-            and Path(filename + ".pickle").exists()
-        ):
+        if Path(filename + ".keras").exists() and Path(filename + ".pickle").exists():
             logger.critical(f"Skip training: {filename}")
             return load_pickle(filename + ".pickle")
         keras.backend.clear_session()
@@ -119,7 +130,7 @@ class Trainer:
             train_input=TrainInput(
                 hyper_params=hyper_params or {}, config=model_config
             ),
-            train_output={},
+            train_output=TrainOutput(),
         )
         logger.info(f"Start training: {pickle_history}")
         if validation_data is None:
@@ -138,14 +149,14 @@ class Trainer:
             validation_data=validation_data,
         )
 
-        history = self.process_history(hist.history)
-        pickle_history["train_output"] = history
+        train_output = self.get_train_output(hist.history)
+        pickle_history["train_output"] = train_output
         history_mean = {
-            key: np.mean(history[key], axis=0) for key in history.keys()
+            key: np.mean(train_output[key], axis=0) for key in train_output.keys()
         }
 
         filename = self.get_filename_without_ext(
-            epochs=len(history["loss"]),
+            epochs=len(train_output.get("loss", 0)),
             hyper_params=hyper_params,
             kfold_case=kfold_case,
         )
@@ -171,9 +182,11 @@ class Trainer:
             for combined_hyper_params in product
         ]
         if self.use_multiprocessing:
+            logger.critical("training with multiprocessing...")
             with multiprocessing.Pool(processes=self.workers) as pool:
                 results = pool.map(self.train, product_hyper_params)
         else:
+            logger.critical("training without multiprocessing...")
             results = [
                 self.train(hyper_params=hyper_param)
                 for hyper_param in product_hyper_params
@@ -234,8 +247,7 @@ class Trainer:
                 sorted((hyper_params or {}).items(), key=lambda x: x[0])
             )
             filename += "".join(
-                f"[{key.upper()}={value}]"
-                for key, value in hyper_params.items()
+                f"[{key.upper()}={value}]" for key, value in hyper_params.items()
             )
         if kfold_case is not None:
             filename += f"_K{kfold_case}of{kfold_splits}"
@@ -244,13 +256,11 @@ class Trainer:
         return str(path / filename)
 
     @staticmethod
-    def process_history(
-        hist_history: Dict[str, List[float]]
-    ) -> Dict[str, List[float]]:
+    def get_train_output(hist_history: Dict[str, List[float]]) -> TrainOutput:
         if "mse" in hist_history:
             hist_history["rmse"] = np.sqrt(hist_history["mse"]).tolist()
             hist_history.pop("mse")
-        return hist_history
+        return TrainOutput(**hist_history)
 
         # for case, combined_hyper_params in enumerate(product, start=1):
         #     train_result = self.train(

@@ -1,8 +1,11 @@
 # flake8: noqa: E402
-from typing import Any, Dict, List
+from pathlib import Path
+from typing import Any, Dict, List, Union
 
 from matplotlib import pyplot as plt
 import numpy as np
+
+from .train import PickleHistory
 
 
 def visualize(
@@ -132,24 +135,40 @@ def select_top_cases(data: List[Dict[str, Any]], n: int = 1) -> List[Dict[str, A
     # Return the top n cases
     return sorted_cases[:n]
 
+
 # Function to plot graphs
-def plot_graphs(data_list):
-    for metric in ['loss', 'mae', 'mape', 'val_loss', 'val_mse', 'val_mae', 'val_mape', 'rmse']:
+def plot_graphs(pickle_path: Union[str, Path]):
+    file_stem = Path(pickle_path).stem
+    pickle_data: List[PickleHistory] = load_pickle(pickle_path)
+
+    for metric in pickle_data[0]["train_output"].keys():
         plt.figure(figsize=(12, 6))
         plt.title(f"{metric} vs Hyperparameters")
         plt.xlabel("Hyperparameters")
         plt.ylabel(metric)
-        
-        for data in data_list:
-            hyper_params = data['train_input']['hyper_params']
-            output_metrics = data['train_output']
-            if metric in output_metrics:
-                last_metric_value = output_metrics[metric][-1]  # Using the last value of the list
-                hyper_params_str = ', '.join(f"{k}={v}" for k, v in hyper_params.items())
-                plt.bar(hyper_params_str, last_metric_value, label=hyper_params_str)
-        
-        plt.xticks(rotation=90)
-        plt.legend()
-        plt.show()
 
-plot_graphs(data_list)
+        for data in pickle_data:
+            hyper_params = data["train_input"]["hyper_params"]
+            output_metrics = data["train_output"]
+            if metric in output_metrics:
+                last_metric_value = output_metrics[metric][
+                    -1
+                ]  # Using the last value of the list
+                hyper_params_str = ", ".join(
+                    f"{k}={v}" for k, v in hyper_params.items()
+                )
+                plt.bar(hyper_params_str, last_metric_value, label=hyper_params_str)
+
+        # Save the figure
+        img_filename = Path(pickle_path).parent / f"{file_stem}_{metric}.png"
+        plt.savefig(img_filename)
+        plt.close()
+
+
+if __name__ == "__main__":
+    from .dataloader import load_pickle
+
+    for pickle_path in Path("output").glob("*.pickle"):
+        if "[" in pickle_path.name and "]" in pickle_path.name:
+            continue
+        plot_graphs(pickle_path)
