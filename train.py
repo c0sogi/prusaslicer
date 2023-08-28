@@ -1,7 +1,7 @@
 import multiprocessing
 from pathlib import Path
 
-from nn.ann import ANN
+from nn.ann import PhysicsInformedANN
 from nn.config import ModelConfig
 from nn.train import Trainer
 from nn.visualize import plot_graphs
@@ -21,18 +21,18 @@ if __name__ == "__main__":
         patience=500,
     )
     trainer = Trainer(
-        ANN,
+        PhysicsInformedANN,
         model_config,
-        model_name="ANN",
+        model_name="PIANN",
         workers=multiprocessing.cpu_count(),
-        use_multiprocessing=True,
+        use_multiprocessing=False,
     )
     trainer.hyper_train(
         {
             "lr": (0.001, 0.005, 0.01),
-            "n0": (50,),
-            "n1": (60, 70, 80, 90, 100, 110, 120, 130),
-            "n2": (50, 60, 70, 80, 90, 100, 110),
+            "n1": (50,),
+            "n2": (60, 70, 80, 90, 100, 110, 120, 130),
+            "n3": (50, 60, 70, 80, 90, 100, 110),
         },
     )
 

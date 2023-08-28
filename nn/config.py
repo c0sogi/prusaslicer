@@ -3,11 +3,36 @@ from typing import Dict, List, Literal, get_args
 
 import pandas as pd
 import tensorflow as tf
-from sklearn.preprocessing import MinMaxScaler
+
+# from sklearn.preprocessing import MinMaxScaler
 
 from .utils.logger import ApiLogger
 
-InputParams = Literal["bedtemp", "exttemp", "layerthickness", "infillspeed"]
+InputParams = Literal[
+    "bedtemp",
+    "exttemp",
+    "layerthickness",
+    "infillspeed",
+    "density",
+    "thermalresistance",
+    "impactstrength",
+    "glasstransitiontemp",
+    "thermalconductivity",
+    "linearthermalexpansioncoefficient",
+]
+INPUT_PARAM_ARGS = get_args(InputParams)
+INPUT_PARAM_INDICES = (
+    INPUT_PARAM_ARGS.index("bedtemp"),
+    INPUT_PARAM_ARGS.index("exttemp"),
+    INPUT_PARAM_ARGS.index("layerthickness"),
+    INPUT_PARAM_ARGS.index("infillspeed"),
+    INPUT_PARAM_ARGS.index("density"),
+    INPUT_PARAM_ARGS.index("thermalresistance"),
+    INPUT_PARAM_ARGS.index("impactstrength"),
+    INPUT_PARAM_ARGS.index("glasstransitiontemp"),
+    INPUT_PARAM_ARGS.index("thermalconductivity"),
+    INPUT_PARAM_ARGS.index("linearthermalexpansioncoefficient"),
+)
 
 OutputParams = Literal[
     "weight", "width1", "width2", "width3", "height", "depth", "strength"
@@ -84,12 +109,12 @@ class ModelConfig:
             f"===== Output Data: {self.output_data.shape} =====\n{self.output_data.head(3)}"  # noqa: E501
         )
 
-        assert self.input_data.shape[0] == self.output_data.shape[0], "데이터 개수 불일치"
+        assert (
+            self.input_data.shape[0] == self.output_data.shape[0]
+        ), "데이터 개수 불일치"
         self.number_of_experiments = self.input_data.shape[0]
         self.number_of_inputs = self.input_data.shape[1]
         self.number_of_outputs = self.output_data.shape[1]
-        self.input_data = self.input_data
-        self.output_data = self.output_data
         x_columns: List[InputParams] = self.input_data.columns.tolist()  # type: ignore  # noqa: E501
         y_columns: List[OutputParams] = self.output_data.columns.tolist()  # type: ignore  # noqa: E501
         x_params = list(get_args(InputParams))
@@ -121,10 +146,26 @@ class ModelConfig:
                 logger.debug(
                     f"{column_name}: {min_values[column_name]} ~ {max_values[column_name]}"  # type: ignore  # noqa: E501
                 )
-        scaler = MinMaxScaler()
-        scaler.fit(self.input_data)
-        self.train_data = pd.DataFrame(scaler.transform(self.input_data), dtype=float)
-        self.train_label = pd.DataFrame(self.get_output_data("strength"), dtype=float)
+        # scaler = MinMaxScaler()
+        # scaler.fit(self.input_data)
+        # self.train_data = pd.DataFrame(
+        #     scaler.transform(self.input_data), dtype=float
+        # )
+        self.train_data = pd.concat(
+            [
+                self.get_input_data(column_name)
+                for column_name in self.input_column_names
+            ],
+            axis=1,
+        )
+        self.train_label = pd.DataFrame(
+            self.get_output_data("strength"), dtype=float
+        )
+        logger.debug(f"===== Train Data: {self.train_data.shape} =====")
+        logger.debug(self.train_data.head(48))
+        logger.debug(f"===== Train Label: {self.train_label.shape} =====")
+        logger.debug(self.train_label.head(3))
+        exit()
 
     def get_input_data(self, column_name: InputParams) -> pd.Series:
         return self.input_data[column_name]
