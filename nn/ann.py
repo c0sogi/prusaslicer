@@ -6,6 +6,7 @@ from keras import Model
 from keras.layers import Dense, Lambda, Layer
 from keras.optimizers import Adam
 from keras.src.engine import data_adapter
+from keras import initializers
 
 from .config import INPUT_PARAM_INDICES, ModelConfig
 
@@ -13,19 +14,19 @@ from .config import INPUT_PARAM_INDICES, ModelConfig
 
 
 # Define the physics-informed layer as a custom Keras layer
-class PhysicsInformedLayer(Layer):
-    def __init__(self, output_dim: int, **kwargs):
+class PhysicsInformedLayer(tf.keras.layers.Layer):
+    def __init__(self, output_dim, **kwargs):
         self.output_dim = output_dim
         super().__init__(**kwargs)
 
-    def build(self, input_shape: tf.TensorShape):
-        # Define the trainable parameters for Young's Modulus (E)
+    def build(self, input_shape):
         self.kernel = self.add_weight(
             name="kernel",
             shape=(input_shape[1], self.output_dim),
-            initializer="uniform",
+            initializer=initializers.RandomNormal(mean=0.0, stddev=1.0),
             trainable=True,
         )
+        super().build(input_shape)
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return compute_mechanical_strength(inputs, self.kernel)
@@ -57,19 +58,19 @@ class PhysicsInformedANN(Model):
 
             # Define layers
             self.physics_layer = PhysicsInformedLayer(model_config.dim_out)
-            self.lambda_layer = Lambda(
-                lambda x: compute_mechanical_strength(
-                    x, self.physics_layer.kernel
-                )
-            )
             self.dense1 = Dense(units=n1, activation=activation)
             self.dense2 = Dense(units=n2, activation=activation)
             self.dense3 = Dense(units=n3, activation=activation)
             self.dense_out = Dense(units=model_config.dim_out)
+            self.compile(
+                optimizer=self.optimizer,
+                loss=physics_informed_loss,
+                metrics=model_config.metrics,
+            )
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         # Combine the physics-informed output and the neural network output
-        return self.lambda_layer(inputs) + self.dense_out(  # type: ignore
+        return self.physics_layer(inputs) + self.dense_out(  # type: ignore
             self.dense3(
                 self.dense2(
                     self.dense1(
@@ -106,7 +107,7 @@ class PhysicsInformedANN(Model):
 
 
 # Utility function to compute the physics-informed mechanical strength
-def compute_mechanical_strength(inputs: tf.Tensor, kernel):
+def compute_mechanical_strength(inputs: tf.Tensor, kernel) -> tf.Tensor:
     # Extract features using the provided constants
     (
         bed_temp,

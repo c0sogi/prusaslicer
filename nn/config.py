@@ -157,7 +157,7 @@ class ModelConfig:
                 for column_name in self.input_column_names
             ],
             axis=1,
-        )
+        ).astype(float)
         self.train_label = pd.DataFrame(
             self.get_output_data("strength"), dtype=float
         )
@@ -165,7 +165,6 @@ class ModelConfig:
         logger.debug(self.train_data.head(48))
         logger.debug(f"===== Train Label: {self.train_label.shape} =====")
         logger.debug(self.train_label.head(3))
-        exit()
 
     def get_input_data(self, column_name: InputParams) -> pd.Series:
         return self.input_data[column_name]
