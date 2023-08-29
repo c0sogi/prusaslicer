@@ -2,19 +2,17 @@
 from typing import Dict, Optional, Union
 
 import tensorflow as tf
-from keras import Model
+from keras import Model, initializers, Sequential
 from keras.layers import Dense, Lambda, Layer
+from keras.losses import Loss, mean_absolute_error
 from keras.optimizers import Adam
 from keras.src.engine import data_adapter
-from keras import initializers
 
 from .config import INPUT_PARAM_INDICES, ModelConfig
 
-# from tensorflow import keras
-
 
 # Define the physics-informed layer as a custom Keras layer
-class PhysicsInformedLayer(tf.keras.layers.Layer):
+class PhysicsInformedLayer(Layer):
     def __init__(self, output_dim, **kwargs):
         self.output_dim = output_dim
         super().__init__(**kwargs)
@@ -64,7 +62,7 @@ class PhysicsInformedANN(Model):
             self.dense_out = Dense(units=model_config.dim_out)
             self.compile(
                 optimizer=self.optimizer,
-                loss=physics_informed_loss,
+                loss=mean_absolute_error,
                 metrics=model_config.metrics,
             )
 
@@ -91,9 +89,9 @@ class PhysicsInformedANN(Model):
 
         with tf.GradientTape() as tape:
             y_pred = self(x, training=True)  # Forward pass
-            loss = physics_informed_loss(y, y_pred, x)  # type: ignore
+            loss = self.compiled_loss(y, y_pred)  # type: ignore
 
-        # Run backwards pass (compute gradients and update weights)
+        # Compute gradients and update weights
         trainable_vars = self.trainable_variables
         gradients = tape.gradient(loss, trainable_vars)
         self.optimizer.apply_gradients(zip(gradients, trainable_vars))
@@ -120,7 +118,9 @@ def compute_mechanical_strength(inputs: tf.Tensor, kernel) -> tf.Tensor:
         glass_transition_temp,
         thermal_conductivity,
         linear_thermal_expansion_coefficient,
-    ) = [inputs[:, i : i + 1] for i in INPUT_PARAM_INDICES]
+    ) = [
+        tf.cast(inputs[:, i : i + 1], tf.float32) for i in INPUT_PARAM_INDICES
+    ]
 
     # Compute Young's Modulus (E)
     # Assume Young's Modulus (E) is a function of bed and extruder temperatures
@@ -137,7 +137,7 @@ def compute_mechanical_strength(inputs: tf.Tensor, kernel) -> tf.Tensor:
     # This is a simplified assumption;
     # in reality, the strain would depend on various other factors
     # including material properties and the object's geometry.
-    epsilon = layer_thickness / infill_speed
+    epsilon = layer_thickness / infill_speed  # type: ignore
 
     # Compute and return mechanical strength (Simplified physics equation for Mechanical Strength)
     # Factors like density, thermal resistance, and impact strength
@@ -147,7 +147,7 @@ def compute_mechanical_strength(inputs: tf.Tensor, kernel) -> tf.Tensor:
         E
         * epsilon
         * (
-            density
+            density  # type: ignore
             * thermal_resistance
             * impact_strength
             * glass_transition_temp
@@ -161,53 +161,43 @@ def compute_mechanical_strength(inputs: tf.Tensor, kernel) -> tf.Tensor:
 def physics_informed_loss(
     y_true: tf.Tensor, y_pred: tf.Tensor, physics_output: tf.Tensor
 ) -> tf.Tensor:
+    y_true = tf.cast(y_true, tf.float32)  # type: ignore
+    y_pred_0 = tf.cast(y_pred[0], tf.float32)
+    y_pred_1 = tf.cast(y_pred[1], tf.float32)
+    physics_output = tf.cast(physics_output, tf.float32)  # type: ignore
     # Loss sum: predicted loss + physics loss
-    return tf.reduce_mean(tf.square(y_true - y_pred[0])) + tf.reduce_mean(
-        tf.square(y_pred[1] - physics_output)
+    return tf.reduce_mean(tf.square(y_true - y_pred_0)) + tf.reduce_mean(
+        tf.square(y_pred_1 - physics_output)
     )
 
 
-# class ANN(keras.Sequential):
-#     def __init__(
-#         self,
-#         model_config: Optional[ModelConfig] = None,
-#         n0: Optional[int] = None,
-#         n1: Optional[int] = None,
-#         n2: Optional[int] = None,
-#         lr: Optional[float] = None,
-#         activation: str = "relu",
-#         **kwargs,
-#     ) -> None:
-#         super().__init__(**kwargs)
-#         if (
-#             model_config is not None
-#             and n1 is not None
-#             and n2 is not None
-#             and lr is not None
-#         ):
-#             self.optimizer = keras.optimizers.Adam(learning_rate=lr)
+class ANN(Sequential):
+    def __init__(
+        self,
+        model_config: Optional[ModelConfig] = None,
+        n1: Optional[int] = None,
+        n2: Optional[int] = None,
+        n3: Optional[int] = None,
+        lr: Optional[float] = None,
+        activation: str = "relu",
+        **kwargs,
+    ) -> None:
+        super().__init__(**kwargs)
+        if (
+            model_config is not None
+            and n1 is not None
+            and n2 is not None
+            and n3 is not None
+            and lr is not None
+        ):
+            self.optimizer = Adam(learning_rate=lr)
+            self.add(Dense(units=n1, activation=activation))
+            self.add(Dense(units=n2, activation=activation))
+            self.add(Dense(units=n3, activation=activation))
+            self.add(Dense(units=model_config.dim_out))
 
-#             # Add the physics-informed layer here as the first layer
-#             # self.add(
-#             #     PhysicsInformedLayer(
-#             #         model_config.dim_out, input_shape=(model_config.dim_in,)
-#             #     )
-#             # )
-
-#             self.add(keras.layers.Dense(units=n0, activation=activation))
-#             self.add(keras.layers.Dense(units=n1, activation=activation))
-#             self.add(keras.layers.Dense(units=n2, activation=activation))
-#             self.add(keras.layers.Dense(units=model_config.dim_out))
-
-#             self.compile(
-#                 optimizer=self.optimizer,
-#                 loss=custom_loss,
-#                 metrics=model_config.metrics,
-#             )
-#             # self.add(
-#             #     keras.layers.Dense(
-#             #         units=n0,
-#             #         input_shape=(model_config.dim_in,),
-#             #         activation=activation,
-#             #     )
-#             # )
+            self.compile(
+                optimizer=self.optimizer,
+                loss=mean_absolute_error,
+                metrics=model_config.metrics,
+            )

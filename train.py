@@ -1,7 +1,7 @@
 import multiprocessing
 from pathlib import Path
 
-from nn.ann import PhysicsInformedANN
+from nn.ann import PhysicsInformedANN, ANN
 from nn.config import ModelConfig
 from nn.train import Trainer
 from nn.visualize import plot_graphs
@@ -12,13 +12,12 @@ if __name__ == "__main__":
         input_path="./raw_data.csv",
         output_path="./output",
         metrics=["mse", "mae", "mape"],
-        dim_in=4,
         dim_out=1,
         kfold_splits=0,
         print_per_epoch=100,
         batch_size=100,
         epochs=10000,
-        patience=500,
+        patience=1000,
     )
     trainer = Trainer(
         PhysicsInformedANN,
