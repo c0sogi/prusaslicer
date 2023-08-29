@@ -1,7 +1,7 @@
 import multiprocessing
 from pathlib import Path
 
-from nn.ann import PhysicsInformedANN, ANN
+from nn.ann import PhysicsInformedANN
 from nn.config import ModelConfig
 from nn.train import Trainer
 from nn.visualize import plot_graphs
@@ -17,7 +17,7 @@ if __name__ == "__main__":
         print_per_epoch=100,
         batch_size=100,
         epochs=10000,
-        patience=2500,
+        patience=5000,
     )
     trainer = Trainer(
         PhysicsInformedANN,
@@ -29,14 +29,14 @@ if __name__ == "__main__":
     trainer.hyper_train(
         {
             "lr": (0.001, 0.005, 0.01),
-            "n1": (50,),
-            "n2": (60, 70, 80, 90, 100, 110, 120, 130),
-            "n3": (50, 60, 70, 80, 90, 100, 110),
+            "n1": (50, 60, 70),
+            "n2": (100, 110, 120, 130),
+            "n3": (50, 60, 70),
         },
     )
 
     # 로스 그래프 그리기
-    for pickle_path in Path("output").glob("*.pickle"):
+    for pickle_path in Path("output").glob("*.pkl"):
         if "[" in pickle_path.name and "]" in pickle_path.name:
             continue
         plot_graphs(pickle_path)

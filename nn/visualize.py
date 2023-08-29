@@ -57,7 +57,10 @@ def visualize_normalized(
 
     # Normalize function
     def normalize(values):
-        return [(value - min(values)) / (max(values) - min(values)) for value in values]
+        return [
+            (value - min(values)) / (max(values) - min(values))
+            for value in values
+        ]
 
     # Normalize the metrics
     normalized_mae = normalize(mae_values)
@@ -90,7 +93,9 @@ def visualize_normalized(
     plt.show()
 
 
-def select_top_cases(data: List[Dict[str, Any]], n: int = 1) -> List[Dict[str, Any]]:
+def select_top_cases(
+    data: List[Dict[str, Any]], n: int = 1
+) -> List[Dict[str, Any]]:
     """
     Selects the top n cases with the lowest average normalized metric values.
 
@@ -104,7 +109,10 @@ def select_top_cases(data: List[Dict[str, Any]], n: int = 1) -> List[Dict[str, A
 
     # Normalize function
     def normalize(values):
-        return [(value - min(values)) / (max(values) - min(values)) for value in values]
+        return [
+            (value - min(values)) / (max(values) - min(values))
+            for value in values
+        ]
 
     # Extracting and normalizing the metric values
     mae_values = [item["mae"] for item in data]
@@ -158,7 +166,9 @@ def plot_graphs(pickle_path: Union[str, Path]):
                 hyper_params_str = ", ".join(
                     f"{k}={v}" for k, v in hyper_params.items()
                 )
-                plt.bar(hyper_params_str, last_metric_value, label=hyper_params_str)
+                plt.bar(
+                    hyper_params_str, last_metric_value, label=hyper_params_str
+                )
 
         # Save the figure
         img_filename = Path(pickle_path).parent / f"{file_stem}_{metric}.png"
@@ -167,7 +177,7 @@ def plot_graphs(pickle_path: Union[str, Path]):
 
 
 if __name__ == "__main__":
-    for pickle_path in Path("output").glob("*.pickle"):
+    for pickle_path in Path("output").glob("*.pkl"):
         if "[" in pickle_path.name and "]" in pickle_path.name:
             continue
         plot_graphs(pickle_path)

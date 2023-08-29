@@ -1,4 +1,5 @@
 # flake8: noqa
+from copy import deepcopy
 from datetime import datetime
 import itertools
 import json
@@ -120,9 +121,12 @@ class Trainer:
             hyper_params=hyper_params,
             kfold_case=kfold_case,
         )
-        if Path(filename + ".keras").exists() and Path(filename + ".pickle").exists():
+        if (
+            Path(filename + ".keras").exists()
+            and Path(filename + ".pkl").exists()
+        ):
             logger.critical(f"Skip training: {filename}")
-            return load_pickle(filename + ".pickle")
+            return load_pickle(filename + ".pkl")
         keras.backend.clear_session()
         model = self.create_model(hyper_params)
 
@@ -152,7 +156,8 @@ class Trainer:
         train_output = self.get_train_output(hist.history)
         pickle_history["train_output"] = train_output
         history_mean = {
-            key: np.mean(train_output[key], axis=0) for key in train_output.keys()
+            key: np.mean(train_output[key], axis=0)
+            for key in train_output.keys()
         }
 
         filename = self.get_filename_without_ext(
@@ -162,7 +167,7 @@ class Trainer:
         )
         logger.info(f"End training: {json.dumps(history_mean, indent=2)}")
         model.save(filename + ".keras")
-        dump_pickle(filename + ".pickle", pickle_history)
+        dump_pickle(filename + ".pkl", pickle_history)
         return pickle_history
 
     def parallel_train(self, hyper_params: HyperParamsDict):
@@ -200,7 +205,7 @@ class Trainer:
                 pickled_histories.append(result)
 
         dump_pickle(
-            self.get_filename_without_ext(add_datetime=True) + ".pickle",
+            self.get_filename_without_ext(add_datetime=True) + ".pkl",
             pickled_histories,
         )
 
@@ -216,14 +221,13 @@ class Trainer:
         self, hyper_params: Optional[HyperParamsDict] = None
     ) -> keras.Sequential:
         hyper_params = hyper_params or {}
-        return self.model_class(
-            self.model_config,
-            **{
-                key: value
-                for key, value in hyper_params.items()
-                if key in signature(self.model_class.__init__).parameters
-            },
-        )
+        model_config = deepcopy(self.model_config)
+        for key, value in hyper_params.items():
+            assert hasattr(
+                model_config, key
+            ), f"{key} is not in {model_config}"
+            setattr(model_config, key, value)
+        return self.model_class(model_config)
 
     def get_filename_without_ext(
         self,
@@ -247,7 +251,8 @@ class Trainer:
                 sorted((hyper_params or {}).items(), key=lambda x: x[0])
             )
             filename += "".join(
-                f"[{key.upper()}={value}]" for key, value in hyper_params.items()
+                f"[{key.upper()}={value}]"
+                for key, value in hyper_params.items()
             )
         if kfold_case is not None:
             filename += f"_K{kfold_case}of{kfold_splits}"

@@ -37,33 +37,20 @@ class PhysicsInformedLayer(Layer):
 
 
 class PhysicsInformedANN(Model):
-    def __init__(
-        self,
-        model_config: ModelConfig,
-        n1: int,
-        n2: int,
-        n3: int,
-        lr: float,
-        activation: str = "relu",
-        **kwargs,
-    ):
+    def __init__(self, model_config: ModelConfig, **kwargs):
         # Define model parameters
         self.model_config = model_config
-        self.n1 = n1
-        self.n2 = n2
-        self.n3 = n3
-        self.lr = lr
-        self.activation = activation
         super().__init__(**kwargs)
 
         # Define optimizer
-        self.optimizer = Adam(learning_rate=lr)
+        self.optimizer = Adam(learning_rate=model_config.lr)
 
         # Define layers
+        activation = model_config.activation
         self.physics_layer = PhysicsInformedLayer(model_config.dim_out)
-        self.dense1 = Dense(units=n1, activation=activation)
-        self.dense2 = Dense(units=n2, activation=activation)
-        self.dense3 = Dense(units=n3, activation=activation)
+        self.dense1 = Dense(units=model_config.n1, activation=activation)
+        self.dense2 = Dense(units=model_config.n2, activation=activation)
+        self.dense3 = Dense(units=model_config.n3, activation=activation)
         self.dense_out = Dense(units=model_config.dim_out)
         self.compile(
             optimizer=self.optimizer,
@@ -110,22 +97,15 @@ class PhysicsInformedANN(Model):
 
     def get_config(self):
         config = super().get_config()
-        config.update(
-            {
-                "model_config": asdict(self.model_config),
-                "n1": self.n1,
-                "n2": self.n2,
-                "n3": self.n3,
-                "lr": self.lr,
-                "activation": self.activation,
-            }
-        )
+        config.update({"model_config": asdict(self.model_config)})
         return config
 
     @classmethod
     def from_config(cls, config):
-        model_config = ModelConfig.from_dict(config.pop("model_config"))
-        return cls(model_config=model_config, **config)
+        return cls(
+            model_config=ModelConfig.from_dict(config.pop("model_config")),
+            **config,
+        )
 
 
 # Utility function to compute the physics-informed mechanical strength

@@ -13,7 +13,9 @@ class AccuracyPerEpoch(keras.callbacks.Callback):
         super().__init__()
         self._ppe = print_per_epoch
 
-    def on_epoch_end(self, epoch: int, logs: Optional[Dict[str, float]] = None):
+    def on_epoch_end(
+        self, epoch: int, logs: Optional[Dict[str, float]] = None
+    ):
         if epoch % self._ppe != 0 or logs is None:
             return
         self.print(

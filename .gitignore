@@ -8,7 +8,7 @@ PRIVATE_*
 *.log
 *.h5
 *.keras
-*.pickle
+*.pkl
 checkpoint/*
 !printer/*
 !template.ini
