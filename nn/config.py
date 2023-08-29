@@ -63,31 +63,28 @@ class ModelConfig:
     kfold_splits: int = 6
     patience: int = 1000
 
-    # 아래는 자동으로 계산됨
-    number_of_experiments: int = field(init=False, repr=False)
-    number_of_inputs: int = field(init=False, repr=False)
-    number_of_outputs: int = field(init=False, repr=False)
-
-    input_data: pd.DataFrame = field(init=False, repr=False)
-    output_data: pd.DataFrame = field(init=False, repr=False)
-    train_data: pd.DataFrame = field(init=False, repr=False)
-    train_label: pd.DataFrame = field(init=False, repr=False)
-
-    input_column_names: List[InputParams] = field(init=False, repr=False)
-    output_column_names: List[OutputParams] = field(init=False, repr=False)
-
-    max_input_values: Dict[InputParams, float] = field(
-        default_factory=dict, repr=False, init=False
-    )
-    min_input_values: Dict[InputParams, float] = field(
-        default_factory=dict, repr=False, init=False
-    )
-    max_output_values: Dict[OutputParams, float] = field(
-        default_factory=dict, repr=False, init=False
-    )
-    min_output_values: Dict[OutputParams, float] = field(
-        default_factory=dict, repr=False, init=False
-    )
+    # # 아래는 자동으로 계산됨
+    # number_of_experiments: int = field(init=False, repr=False)
+    # number_of_inputs: int = field(init=False, repr=False)
+    # number_of_outputs: int = field(init=False, repr=False)
+    # input_data: pd.DataFrame = field(init=False, repr=False)
+    # output_data: pd.DataFrame = field(init=False, repr=False)
+    # train_data: pd.DataFrame = field(init=False, repr=False)
+    # train_label: pd.DataFrame = field(init=False, repr=False)
+    # input_column_names: List[InputParams] = field(init=False, repr=False)
+    # output_column_names: List[OutputParams] = field(init=False, repr=False)
+    # max_input_values: Dict[InputParams, float] = field(
+    #     default_factory=dict, repr=False, init=False
+    # )
+    # min_input_values: Dict[InputParams, float] = field(
+    #     default_factory=dict, repr=False, init=False
+    # )
+    # max_output_values: Dict[OutputParams, float] = field(
+    #     default_factory=dict, repr=False, init=False
+    # )
+    # min_output_values: Dict[OutputParams, float] = field(
+    #     default_factory=dict, repr=False, init=False
+    # )
 
     def __post_init__(self) -> None:
         tf.random.set_seed(self.seed)
@@ -130,27 +127,27 @@ class ModelConfig:
         self.input_column_names = x_columns
         self.output_column_names = y_columns
 
-        # 최대/최소값 계산
-        for data, column_names, max_values, min_values in (
-            (
-                self.input_data,
-                self.input_column_names,
-                self.max_input_values,
-                self.min_input_values,
-            ),
-            (
-                self.output_data,
-                self.output_column_names,
-                self.max_output_values,
-                self.min_output_values,
-            ),
-        ):
-            for column_name in column_names:
-                max_values[column_name] = data[column_name].max()  # type: ignore  # noqa: E501
-                min_values[column_name] = data[column_name].min()  # type: ignore  # noqa: E501
-                logger.debug(
-                    f"{column_name}: {min_values[column_name]} ~ {max_values[column_name]}"  # type: ignore  # noqa: E501
-                )
+        # # 최대/최소값 계산
+        # for data, column_names, max_values, min_values in (
+        #     (
+        #         self.input_data,
+        #         self.input_column_names,
+        #         self.max_input_values,
+        #         self.min_input_values,
+        #     ),
+        #     (
+        #         self.output_data,
+        #         self.output_column_names,
+        #         self.max_output_values,
+        #         self.min_output_values,
+        #     ),
+        # ):
+        #     for column_name in column_names:
+        #         max_values[column_name] = data[column_name].max()  # type: ignore  # noqa: E501
+        #         min_values[column_name] = data[column_name].min()  # type: ignore  # noqa: E501
+        #         logger.debug(
+        #             f"{column_name}: {min_values[column_name]} ~ {max_values[column_name]}"  # type: ignore  # noqa: E501
+        #         )
         # scaler = MinMaxScaler()
         # scaler.fit(self.input_data)
         # self.train_data = pd.DataFrame(
@@ -176,3 +173,7 @@ class ModelConfig:
 
     def get_output_data(self, column_name: OutputParams) -> pd.Series:
         return self.output_data[column_name]
+
+    @classmethod
+    def from_dict(cls, config_dict: Dict):
+        return cls(**config_dict)

@@ -1,4 +1,5 @@
 # flake8: noqa
+from dataclasses import asdict
 from typing import Dict, Optional, Union
 
 import tensorflow as tf
@@ -13,7 +14,7 @@ from .config import INPUT_PARAM_INDICES, ModelConfig
 
 # Define the physics-informed layer as a custom Keras layer
 class PhysicsInformedLayer(Layer):
-    def __init__(self, output_dim, **kwargs):
+    def __init__(self, output_dim: int, **kwargs):
         self.output_dim = output_dim
         super().__init__(**kwargs)
 
@@ -29,42 +30,46 @@ class PhysicsInformedLayer(Layer):
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         return compute_mechanical_strength(inputs, self.kernel)
 
+    def get_config(self):
+        config = super().get_config()
+        config.update({"output_dim": self.output_dim})
+        return config
+
 
 class PhysicsInformedANN(Model):
     def __init__(
         self,
-        model_config: Optional[ModelConfig] = None,
-        n1: Optional[int] = None,
-        n2: Optional[int] = None,
-        n3: Optional[int] = None,
-        lr: Optional[float] = None,
+        model_config: ModelConfig,
+        n1: int,
+        n2: int,
+        n3: int,
+        lr: float,
         activation: str = "relu",
         **kwargs,
     ):
+        # Define model parameters
+        self.model_config = model_config
+        self.n1 = n1
+        self.n2 = n2
+        self.n3 = n3
+        self.lr = lr
+        self.activation = activation
         super().__init__(**kwargs)
-        # This is needed when loading the model
-        # because the model is loaded without the constructor being called
-        if (
-            model_config is not None
-            and n1 is not None
-            and n2 is not None
-            and n3 is not None
-            and lr is not None
-        ):
-            # Define optimizer
-            self.optimizer = Adam(learning_rate=lr)
 
-            # Define layers
-            self.physics_layer = PhysicsInformedLayer(model_config.dim_out)
-            self.dense1 = Dense(units=n1, activation=activation)
-            self.dense2 = Dense(units=n2, activation=activation)
-            self.dense3 = Dense(units=n3, activation=activation)
-            self.dense_out = Dense(units=model_config.dim_out)
-            self.compile(
-                optimizer=self.optimizer,
-                loss=mean_absolute_error,
-                metrics=model_config.metrics,
-            )
+        # Define optimizer
+        self.optimizer = Adam(learning_rate=lr)
+
+        # Define layers
+        self.physics_layer = PhysicsInformedLayer(model_config.dim_out)
+        self.dense1 = Dense(units=n1, activation=activation)
+        self.dense2 = Dense(units=n2, activation=activation)
+        self.dense3 = Dense(units=n3, activation=activation)
+        self.dense_out = Dense(units=model_config.dim_out)
+        self.compile(
+            optimizer=self.optimizer,
+            loss=mean_absolute_error,
+            metrics=model_config.metrics,
+        )
 
     def call(self, inputs: tf.Tensor) -> tf.Tensor:
         # Combine the physics-informed output and the neural network output
@@ -102,6 +107,25 @@ class PhysicsInformedANN(Model):
             return {m.name: m.result() for m in self.metrics}
         else:
             return {}
+
+    def get_config(self):
+        config = super().get_config()
+        config.update(
+            {
+                "model_config": asdict(self.model_config),
+                "n1": self.n1,
+                "n2": self.n2,
+                "n3": self.n3,
+                "lr": self.lr,
+                "activation": self.activation,
+            }
+        )
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        model_config = ModelConfig.from_dict(config.pop("model_config"))
+        return cls(model_config=model_config, **config)
 
 
 # Utility function to compute the physics-informed mechanical strength

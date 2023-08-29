@@ -17,7 +17,7 @@ if __name__ == "__main__":
         print_per_epoch=100,
         batch_size=100,
         epochs=10000,
-        patience=1000,
+        patience=2500,
     )
     trainer = Trainer(
         PhysicsInformedANN,
