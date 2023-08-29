@@ -24,7 +24,14 @@ InputParams = Literal[
 ]
 
 OutputParams = Literal[
-    "weight", "width1", "width2", "width3", "height", "depth", "strength"
+    "weight",
+    "width1",
+    "width2",
+    "width3",
+    "height",
+    "depth",
+    "strength",
+    "lengthavg",
 ]
 
 

@@ -40,7 +40,9 @@ class SliceOptions:
         ]
 
 
-def clean_folder(folder_name: str, except_files: Optional[List[str]] = None) -> None:
+def clean_folder(
+    folder_name: str, except_files: Optional[List[str]] = None
+) -> None:
     for file_path in Path(folder_name).iterdir():
         if file_path.name.lower() not in (except_files or []):
             file_path.unlink()
@@ -89,7 +91,9 @@ if __name__ == "__main__":
     for file_no, config_file in enumerate(config_file_names, start=1):
         duplicate_keys = find_duplicate_keys(config_file)
         if duplicate_keys:
-            raise ValueError(f"Duplicate keys found in {config_file}: {duplicate_keys}")
+            raise ValueError(
+                f"Duplicate keys found in {config_file}: {duplicate_keys}"
+            )
         options = SliceOptions(
             stl=stl_path,
             config=config_file,

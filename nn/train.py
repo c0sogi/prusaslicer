@@ -109,7 +109,7 @@ class Trainer:
             logger.info(f"Already trained. Skipping...")
             return pickle_history
 
-        logger.info(f"Start training: {pickle_history}")
+        logger.info(f"Start training: {model_config}")
         if validation_data is None:
             x_train, x_val, y_train, y_val = train_test_split(
                 x_train, y_train, test_size=val_split
@@ -215,7 +215,6 @@ class Trainer:
             )
             + ".keras"
         )
-        logger.info(f"last_epoch: {last_epoch}, matched_stem: {matched_stem}")
         if last_epoch is not None and matched_stem is not None:
             model = keras.models.load_model(matched_stem + ".keras")
             if model is None:

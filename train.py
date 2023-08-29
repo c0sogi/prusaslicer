@@ -12,12 +12,12 @@ if __name__ == "__main__":
         input_path="./raw_data.csv",
         output_path="./output",
         metrics=["mse", "mae", "mape"],
-        dim_out=1,
+        dim_out=2,
         kfold_splits=0,
         print_per_epoch=100,
-        batch_size=100,
-        epochs=1000,
-        patience=5000,
+        batch_size=500,
+        epochs=20000,
+        patience=1000,
     )
     trainer = Trainer(
         PhysicsInformedANN,

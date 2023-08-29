@@ -97,9 +97,13 @@ class DataLoader:
             ],
             axis=1,
         ).astype(float)
-        self.train_label = pd.DataFrame(
-            self.get_output_data("strength"), dtype=float
-        )
+        self.train_label = pd.concat(
+            [
+                self.get_output_data("strength"),
+                self.get_output_data("lengthavg"),
+            ],
+            axis=1,
+        ).astype(float)
         logger.debug(f"===== Train Data: {self.train_data.shape} =====")
         logger.debug(self.train_data.head(48))
         logger.debug(f"===== Train Label: {self.train_label.shape} =====")
