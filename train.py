@@ -16,7 +16,7 @@ if __name__ == "__main__":
         kfold_splits=0,
         print_per_epoch=100,
         batch_size=100,
-        epochs=10000,
+        epochs=1000,
         patience=5000,
     )
     trainer = Trainer(

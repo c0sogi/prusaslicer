@@ -1,37 +1,31 @@
 # flake8: noqa
-from copy import deepcopy
-from datetime import datetime
 import itertools
 import json
 import multiprocessing
-from dataclasses import dataclass
-from pathlib import Path
 import re
-from typing import (
-    Dict,
-    List,
-    Optional,
-    Tuple,
-    Type,
-    Union,
-)
+from copy import deepcopy
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from tensorflow import keras
 
 from .callbacks import AccuracyPerEpoch, EarlyStopping
 from .config import ModelConfig
-from .dataloader import dataset_kfold_iterator, dump_pickle, load_pickle
-from .utils.logger import ApiLogger
+from .dataloader import DataLoader, dump_pickle, load_pickle
 from .schemas import (
     HyperParamsDict,
     HyperParamsDictAll,
+    PickleHistory,
     TrainInput,
     TrainOutput,
-    PickleHistory,
 )
+from .utils.logger import ApiLogger
 
 logger = ApiLogger(__name__)
 
@@ -46,6 +40,15 @@ class Trainer:
 
     def __post_init__(self) -> None:
         self._model_name = self.model_name or str(self.model_class.__name__)
+        self._data_loader = DataLoader(self.model_config)
+
+    @property
+    def train_data(self) -> pd.DataFrame:
+        return self._data_loader.train_data
+
+    @property
+    def train_label(self) -> pd.DataFrame:
+        return self._data_loader.train_label
 
     def train(
         self, hyper_params: Optional[HyperParamsDict] = None
@@ -59,11 +62,7 @@ class Trainer:
             # Kfolds
             pickle_histories = []  # type: List[PickleHistory]
             for kfold_case, (x_train, y_train, x_test, y_test) in enumerate(
-                dataset_kfold_iterator(
-                    model_config.train_data,
-                    model_config.train_label,
-                    kfold_splits,
-                ),
+                self._data_loader.dataset_kfold_iterator(kfold_splits),
                 start=1,
             ):
                 logger.info(f"Kfolds: {kfold_case}/{kfold_splits}")
@@ -80,8 +79,8 @@ class Trainer:
         else:
             # Normal
             return self._train(
-                x_train=model_config.train_data,
-                y_train=model_config.train_label,
+                x_train=self.train_data,
+                y_train=self.train_label,
                 hyper_params=hyper_params,
             )
 
@@ -95,28 +94,21 @@ class Trainer:
         val_split: Optional[float] = 0.1,
     ) -> PickleHistory:
         model_config = self.apply_hyper_params(hyper_params)
-        load_filename = self.get_filename_without_ext(
-            epochs=model_config.epochs,
-            hyper_params=hyper_params,
-            kfold_case=kfold_case,
-        )
-        if (
-            Path(load_filename + ".keras").exists()
-            and Path(load_filename + ".pkl").exists()
-        ):
-            logger.info(f"Skip training: {load_filename}")
-            return load_pickle(load_filename + ".pkl")
+        tf.random.set_seed(model_config.seed)
         keras.backend.clear_session()
         model, pickle_history = self.create_model_and_history(
             model_config, hyper_params, kfold_case
         )
+        if self.get_current_epoch(pickle_history) >= model_config.epochs:
+            logger.info(f"Already trained. Skipping...")
+            return pickle_history
+
         logger.info(f"Start training: {pickle_history}")
         if validation_data is None:
             x_train, x_val, y_train, y_val = train_test_split(
                 x_train, y_train, test_size=val_split
             )
             validation_data = (x_val, y_val)
-
         hist = model.fit(
             x_train,
             y_train,
@@ -128,13 +120,12 @@ class Trainer:
             batch_size=model_config.batch_size,
             validation_data=validation_data,
         )
-
         train_output = self.get_train_output(hist.history)
-        history_mean = {
-            key: np.mean(train_output[key], axis=0)
+        best_losses = {
+            key: np.min(train_output[key], axis=0)
             for key in train_output.keys()
         }
-        logger.info(f"End training: {json.dumps(history_mean, indent=2)}")
+        logger.info(f"Best losses: {json.dumps(best_losses, indent=2)}")
 
         pickle_history = self.update_pickle_history(
             train_output, pickle_history
@@ -209,17 +200,13 @@ class Trainer:
             )
             + ".keras"
         )
-        if (
-            last_epoch is not None
-            and matched_stem is not None
-            and Path(matched_stem + ".keras").exists()
-            and Path(matched_stem + ".pkl").exists()
-        ):
+        logger.info(f"last_epoch: {last_epoch}, matched_stem: {matched_stem}")
+        if last_epoch is not None and matched_stem is not None:
             model = keras.models.load_model(matched_stem + ".keras")
             if model is None:
                 raise ValueError(f"Model not found: {matched_stem}")
-            logger.critical(
-                f"Last stopped epoch: {last_epoch}, File: {matched_stem}"
+            logger.info(
+                f"Loading model [{matched_stem}] with last: {last_epoch}"
             )
             return model, load_pickle(matched_stem + ".pkl")
         return self.model_class(model_config), PickleHistory(
@@ -313,13 +300,6 @@ class Trainer:
 
         # 에포크 정보를 제거합니다.
         epoch_removed_file_stem = epoch_re.sub("", file_stem)
-        print(
-            {
-                "file_stem": file_stem,
-                "file_path": file_path,
-                "epoch_removed_file_stem": epoch_removed_file_stem,
-            }
-        )  # noqa: E501
         max_epoch: int = -1
         matched_stem: Optional[str] = None
 
@@ -339,12 +319,8 @@ class Trainer:
             matched_stem = _file_path.stem
 
         if max_epoch != -1 and matched_stem is not None:
-            logger.info(
-                f"Last stopped epoch: {max_epoch}, File: {matched_stem}"
-            )  # noqa: E501
-            return max_epoch, matched_stem
+            return max_epoch, str(folder_path / matched_stem)
         else:
-            logger.info(f"Last stopped epoch not found: {file_path}")
             return None, None
 
     @staticmethod

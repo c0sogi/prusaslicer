@@ -3,13 +3,14 @@ from dataclasses import asdict
 from typing import Dict, Optional, Union
 
 import tensorflow as tf
-from keras import Model, initializers, Sequential
+from keras import Model, Sequential, initializers
 from keras.layers import Dense, Lambda, Layer
 from keras.losses import Loss, mean_absolute_error
 from keras.optimizers import Adam
 from keras.src.engine import data_adapter
 
-from .config import INPUT_PARAM_INDICES, ModelConfig
+from .config import ModelConfig
+from .schemas import INPUT_PARAM_INDICES
 
 
 # Define the physics-informed layer as a custom Keras layer
