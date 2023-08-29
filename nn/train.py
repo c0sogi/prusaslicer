@@ -5,16 +5,14 @@ import itertools
 import json
 import multiprocessing
 from dataclasses import dataclass
-from inspect import signature
 from pathlib import Path
+import re
 from typing import (
     Dict,
-    Iterable,
     List,
     Optional,
     Tuple,
     Type,
-    TypedDict,
     Union,
 )
 
@@ -22,44 +20,25 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from tensorflow import keras
-from typing_extensions import NotRequired
 
 from .callbacks import AccuracyPerEpoch, EarlyStopping
 from .config import ModelConfig
 from .dataloader import dataset_kfold_iterator, dump_pickle, load_pickle
 from .utils.logger import ApiLogger
+from .schemas import (
+    HyperParamsDict,
+    HyperParamsDictAll,
+    TrainInput,
+    TrainOutput,
+    PickleHistory,
+)
 
 logger = ApiLogger(__name__)
-
-HyperParamValue = Union[int, float]
-HyperParamsDict = Dict[str, HyperParamValue]
-HyperParamsDictAll = Dict[str, Iterable[HyperParamValue]]
-
-
-class TrainInput(TypedDict):
-    hyper_params: HyperParamsDict
-    config: ModelConfig
-
-
-class TrainOutput(TypedDict):
-    loss: NotRequired[List[float]]
-    mae: NotRequired[List[float]]
-    mape: NotRequired[List[float]]
-    val_loss: NotRequired[List[float]]
-    val_mse: NotRequired[List[float]]
-    val_mae: NotRequired[List[float]]
-    val_mape: NotRequired[List[float]]
-    rmse: NotRequired[List[float]]
-
-
-class PickleHistory(TypedDict):
-    train_input: TrainInput
-    train_output: TrainOutput
 
 
 @dataclass
 class Trainer:
-    model_class: Type[keras.Sequential]
+    model_class: Type[keras.Model]
     model_config: ModelConfig
     model_name: Optional[str] = None
     workers: int = multiprocessing.cpu_count()
@@ -115,26 +94,21 @@ class Trainer:
         kfold_case: Optional[int] = None,
         val_split: Optional[float] = 0.1,
     ) -> PickleHistory:
-        model_config = self.model_config
-        filename = self.get_filename_without_ext(
+        model_config = self.apply_hyper_params(hyper_params)
+        load_filename = self.get_filename_without_ext(
             epochs=model_config.epochs,
             hyper_params=hyper_params,
             kfold_case=kfold_case,
         )
         if (
-            Path(filename + ".keras").exists()
-            and Path(filename + ".pkl").exists()
+            Path(load_filename + ".keras").exists()
+            and Path(load_filename + ".pkl").exists()
         ):
-            logger.critical(f"Skip training: {filename}")
-            return load_pickle(filename + ".pkl")
+            logger.info(f"Skip training: {load_filename}")
+            return load_pickle(load_filename + ".pkl")
         keras.backend.clear_session()
-        model = self.create_model(hyper_params)
-
-        pickle_history: PickleHistory = PickleHistory(
-            train_input=TrainInput(
-                hyper_params=hyper_params or {}, config=model_config
-            ),
-            train_output=TrainOutput(),
+        model, pickle_history = self.create_model_and_history(
+            model_config, hyper_params, kfold_case
         )
         logger.info(f"Start training: {pickle_history}")
         if validation_data is None:
@@ -148,30 +122,31 @@ class Trainer:
             y_train,
             epochs=model_config.epochs,
             verbose=0,  # type: ignore
-            callbacks=self.create_callbacks(),
+            callbacks=self.create_callbacks(
+                start_epoch=self.get_current_epoch(pickle_history)
+            ),
             batch_size=model_config.batch_size,
             validation_data=validation_data,
         )
 
         train_output = self.get_train_output(hist.history)
-        pickle_history["train_output"] = train_output
         history_mean = {
             key: np.mean(train_output[key], axis=0)
             for key in train_output.keys()
         }
+        logger.info(f"End training: {json.dumps(history_mean, indent=2)}")
 
-        filename = self.get_filename_without_ext(
-            epochs=len(train_output.get("loss", 0)),
+        pickle_history = self.update_pickle_history(
+            train_output, pickle_history
+        )
+        save_filename = self.get_filename_without_ext(
+            epochs=self.get_current_epoch(pickle_history),
             hyper_params=hyper_params,
             kfold_case=kfold_case,
         )
-        logger.info(f"End training: {json.dumps(history_mean, indent=2)}")
-        model.save(filename + ".keras")
-        dump_pickle(filename + ".pkl", pickle_history)
+        model.save(save_filename + ".keras")
+        dump_pickle(save_filename + ".pkl", pickle_history)
         return pickle_history
-
-    def parallel_train(self, hyper_params: HyperParamsDict):
-        return self.train(hyper_params)
 
     def hyper_train(
         self,
@@ -209,25 +184,50 @@ class Trainer:
             pickled_histories,
         )
 
-    def create_callbacks(self) -> List[keras.callbacks.Callback]:
+    def create_callbacks(
+        self, start_epoch: int = 0
+    ) -> List[keras.callbacks.Callback]:
         return [
             AccuracyPerEpoch(
+                start_epoch=start_epoch,
                 print_per_epoch=self.model_config.print_per_epoch,
             ),
             EarlyStopping(patience=self.model_config.patience),
         ]
 
-    def create_model(
-        self, hyper_params: Optional[HyperParamsDict] = None
-    ) -> keras.Sequential:
-        hyper_params = hyper_params or {}
-        model_config = deepcopy(self.model_config)
-        for key, value in hyper_params.items():
-            assert hasattr(
-                model_config, key
-            ), f"{key} is not in {model_config}"
-            setattr(model_config, key, value)
-        return self.model_class(model_config)
+    def create_model_and_history(
+        self,
+        model_config: ModelConfig,
+        hyper_params: Optional[HyperParamsDict] = None,
+        kfold_case: Optional[int] = None,
+    ) -> Tuple[keras.Model, PickleHistory]:
+        last_epoch, matched_stem = self.find_stem_of_last_epoch(
+            self.get_filename_without_ext(
+                epochs=model_config.epochs,
+                hyper_params=hyper_params,
+                kfold_case=kfold_case,
+            )
+            + ".keras"
+        )
+        if (
+            last_epoch is not None
+            and matched_stem is not None
+            and Path(matched_stem + ".keras").exists()
+            and Path(matched_stem + ".pkl").exists()
+        ):
+            model = keras.models.load_model(matched_stem + ".keras")
+            if model is None:
+                raise ValueError(f"Model not found: {matched_stem}")
+            logger.critical(
+                f"Last stopped epoch: {last_epoch}, File: {matched_stem}"
+            )
+            return model, load_pickle(matched_stem + ".pkl")
+        return self.model_class(model_config), PickleHistory(
+            train_input=TrainInput(
+                hyper_params=hyper_params or {}, config=model_config
+            ),
+            train_output=TrainOutput(),
+        )
 
     def get_filename_without_ext(
         self,
@@ -260,6 +260,18 @@ class Trainer:
             filename += f"_{datetime.now():%Y_%m_%d_%H%M%S}"
         return str(path / filename)
 
+    def apply_hyper_params(
+        self, hyper_params: Optional[HyperParamsDict] = None
+    ) -> ModelConfig:
+        model_config = deepcopy(self.model_config)
+        if hyper_params is not None:
+            for key, value in hyper_params.items():
+                assert hasattr(
+                    model_config, key
+                ), f"{key} is not in {model_config}"
+                setattr(model_config, key, value)
+        return model_config
+
     @staticmethod
     def get_train_output(hist_history: Dict[str, List[float]]) -> TrainOutput:
         if "mse" in hist_history:
@@ -267,11 +279,74 @@ class Trainer:
             hist_history.pop("mse")
         return TrainOutput(**hist_history)
 
-        # for case, combined_hyper_params in enumerate(product, start=1):
-        #     train_result = self.train(
-        #         case,
-        #         hyper_params=dict(zip(hyper_params, combined_hyper_params)),
-        #     )
-        #     pickled_histories.extend(train_result) if isinstance(
-        #         train_result, list
-        #     ) else pickled_histories.append(train_result)
+    @staticmethod
+    def update_pickle_history(
+        train_output: TrainOutput, pickle_history: PickleHistory
+    ) -> PickleHistory:
+        for key, value in train_output.items():
+            original_value = pickle_history["train_output"].get(key)
+            if isinstance(original_value, list):
+                pickle_history["train_output"][key].extend(value)
+            elif isinstance(original_value, np.ndarray) and isinstance(
+                value, np.ndarray
+            ):
+                pickle_history["train_output"][key] = np.concatenate(
+                    (original_value, value)
+                )
+            else:
+                if original_value is not None:
+                    logger.warning(
+                        f"original_value: {original_value}, value: {value}"
+                    )
+                pickle_history["train_output"][key] = value
+
+        pickle_history["train_output"] = train_output
+        return pickle_history
+
+    @staticmethod
+    def find_stem_of_last_epoch(
+        file_path: str,
+    ) -> Union[Tuple[int, str], Tuple[None, None]]:
+        folder_path = Path(file_path).parent
+        file_stem = Path(file_path).stem
+        epoch_re = re.compile(r"_E(\d+)")
+
+        # 에포크 정보를 제거합니다.
+        epoch_removed_file_stem = epoch_re.sub("", file_stem)
+        print(
+            {
+                "file_stem": file_stem,
+                "file_path": file_path,
+                "epoch_removed_file_stem": epoch_removed_file_stem,
+            }
+        )  # noqa: E501
+        max_epoch: int = -1
+        matched_stem: Optional[str] = None
+
+        # 폴더 내의 모든 파일 검색
+        for _file_path in folder_path.glob("*.pkl"):
+            epoch_removed_stem = epoch_re.sub("", _file_path.stem)
+            # 같은 이름 패턴이지만 에포크가 다른 파일을 찾습니다.
+            if epoch_removed_stem != epoch_removed_file_stem:
+                continue
+            match = epoch_re.search(_file_path.stem)
+            if not match:
+                continue
+            epoch = int(match.group(1))
+            if epoch <= max_epoch:
+                continue
+            max_epoch = epoch
+            matched_stem = _file_path.stem
+
+        if max_epoch != -1 and matched_stem is not None:
+            logger.info(
+                f"Last stopped epoch: {max_epoch}, File: {matched_stem}"
+            )  # noqa: E501
+            return max_epoch, matched_stem
+        else:
+            logger.info(f"Last stopped epoch not found: {file_path}")
+            return None, None
+
+    @staticmethod
+    def get_current_epoch(pickle_history: PickleHistory) -> int:
+        return len(pickle_history["train_output"].get("loss", []))

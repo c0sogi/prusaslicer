@@ -6,17 +6,28 @@ from typing import Any, Dict, Iterator, List, Tuple, Union
 import pandas as pd
 from sklearn.model_selection import KFold
 
+from .schemas import PickleHistory
+
 PathLike = Union[str, Path]
 
 
-def dump_pickle(file_path: PathLike, data: Any) -> None:
+def dump_pickle(
+    file_path: PathLike, data: Union[PickleHistory, List[PickleHistory]]
+) -> None:
     with open(file_path, "wb") as f:
         pickle.dump(data, f)
 
 
-def load_pickle(file_path: PathLike) -> Any:
+def load_pickle(file_path: PathLike) -> PickleHistory:
     with open(file_path, "rb") as f:
         return pickle.load(f)
+
+
+def load_pickle_list(
+    file_path: PathLike,
+) -> List[PickleHistory]:
+    with open(file_path, "rb") as f:
+        return list(pickle.load(f))
 
 
 def dump_jsonl(file_path: PathLike, data: List[Any]) -> None:

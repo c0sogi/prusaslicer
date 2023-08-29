@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Union
 from matplotlib import pyplot as plt
 import numpy as np
 
-from .dataloader import load_pickle
+from .dataloader import load_pickle_list
 from .train import PickleHistory
 
 
@@ -148,7 +148,7 @@ def select_top_cases(
 # Function to plot graphs
 def plot_graphs(pickle_path: Union[str, Path]):
     file_stem = Path(pickle_path).stem
-    pickle_data: List[PickleHistory] = load_pickle(pickle_path)
+    pickle_data: List[PickleHistory] = load_pickle_list(pickle_path)
 
     for metric in pickle_data[0]["train_output"].keys():
         plt.figure(figsize=(12, 6))
