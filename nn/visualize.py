@@ -1,11 +1,11 @@
 # flake8: noqa: E402
 from pathlib import Path
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
-from matplotlib import pyplot as plt
 import numpy as np
+from matplotlib import pyplot as plt
 
-from .dataloader import load_pickle_list
+from .dataloader import PathLike, load_pickle_list, load_pickle
 from .train import PickleHistory
 
 
@@ -176,8 +176,123 @@ def plot_graphs(pickle_path: Union[str, Path]):
         plt.close()
 
 
+def plot_metrics(history, metrics):
+    plt.figure(figsize=(15, 10))
+
+    for i, metric in enumerate(metrics, 1):
+        plt.subplot(2, 4, i)
+        plt.plot(history[metric], label="Training {}".format(metric))
+
+        # MAPE에 대한 y축 범위 조절
+        if metric == "mape" or metric == "val_mape":
+            plt.ylim(0, 150)  # 예를 들어 0%에서 150% 사이로 설정
+        else:
+            plt.ylim(0, 3)
+
+        val_metric = "val_" + metric
+        if val_metric in history:
+            plt.plot(
+                history[val_metric],
+                label="Validation {}".format(metric),
+                linestyle="--",
+            )
+        plt.legend()
+        plt.title(metric)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_loss(
+    pkl_dir: PathLike,
+    save_dir: PathLike,
+    ymin: Optional[float] = None,
+    ymax: Optional[float] = None,
+    xmin: Optional[int] = None,
+    xmax: Optional[int] = None,
+    combined: bool = False,
+):
+    pkl_dir, save_dir = Path(pkl_dir), Path(save_dir)
+    save_dir.mkdir(exist_ok=True, parents=True)
+
+    num_files = len(list(pkl_dir.glob("*.pkl")))
+
+    if combined:
+        plt.figure(figsize=(12, 10))
+    else:
+        plt.figure(figsize=(10, 6))
+
+    for pkl_path in pkl_dir.glob("*.pkl"):
+        # 데이터 로드
+        data = load_pickle(pkl_path)
+        assert "loss" in data["train_output"], "No loss data"
+        loss = data["train_output"]["loss"]
+
+        # 그래프 그리기
+        plt.plot(
+            loss,
+            label=f"Loss for {pkl_path.name}" if combined else "Training Loss",
+            linewidth=0.4,
+        )
+
+        if not combined:
+            plt.title(f"Epoch vs Loss for {pkl_path.name}")
+            plt.xlabel("Epoch")
+            plt.ylabel("Loss")
+            if ymin is not None and ymax is not None:
+                plt.ylim(ymin, ymax)
+            if xmin is not None and xmax is not None:
+                plt.xlim(xmin, xmax)
+            plt.legend(
+                loc="upper left", bbox_to_anchor=(1, 1), prop={"size": 10}
+            )
+            # 이미지로 저장
+            img_name = pkl_path.stem + ".png"
+            save_path = save_dir / img_name
+            plt.savefig(save_path, bbox_inches="tight")
+            plt.close()
+
+    if combined:
+        plt.title("Combined Epoch vs Loss")
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        if ymin is not None and ymax is not None:
+            plt.ylim(ymin, ymax)
+        if xmin is not None and xmax is not None:
+            plt.xlim(xmin, xmax)
+
+        # ncol 값을 항목 개수에 따라 조절
+        ncol = (num_files - 1) // 60 + 1
+
+        plt.legend(
+            loc="upper left",
+            bbox_to_anchor=(1, 1),
+            prop={"size": 8},
+            ncol=ncol,
+        )
+
+        # 이미지로 저장
+        save_path = save_dir / "combined_loss.png"
+        plt.savefig(save_path, bbox_inches="tight")
+        plt.close()
+
+
 if __name__ == "__main__":
-    for pickle_path in Path("output").glob("*.pkl"):
-        if "[" in pickle_path.name and "]" in pickle_path.name:
-            continue
-        plot_graphs(pickle_path)
+    # for pickle_path in Path("output").glob("*.pkl"):
+    #     if "[" in pickle_path.name and "]" in pickle_path.name:
+    #         continue
+    #     plot_graphs(pickle_path)
+
+    # 주어진 out 데이터를 사용하여 함수를 호출
+    # path = "output/PIANN_E9277[LR=0.001][N1=20][N2=10][N3=5].pkl"
+    # history = load_pickle(path)["train_output"]
+    # plot_metrics(history, ["loss", "mae", "mape", "rmse"])
+
+    plot_loss(
+        "output",
+        "image",
+        ymin=0.4,
+        ymax=0.5,
+        xmin=2000,
+        xmax=20000,
+        combined=True,
+    )

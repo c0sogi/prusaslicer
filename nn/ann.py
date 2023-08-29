@@ -1,6 +1,6 @@
 # flake8: noqa
 from dataclasses import asdict
-from typing import Dict, List, Optional, Union
+from typing import Callable, Dict, List, Optional, Union
 
 import tensorflow as tf
 from keras import Model, Sequential, initializers
@@ -10,6 +10,20 @@ from keras.optimizers import Adam
 from keras.src.engine import data_adapter
 
 from .config import ModelConfig
+
+
+def physics_informed_loss(
+    w1: float = 0.5, w2: float = 0.5
+) -> Callable[[tf.Tensor, tf.Tensor], tf.Tensor]:
+    def compute_loss(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
+        # Assuming y_true and y_pred are of shape (batch_size, 2)
+        # and the first column is for mechanical strength and the second column is for printed quality
+        # Compute the loss for each prediction, and combine the losses using the weights
+        return w1 * mean_absolute_error(
+            y_true[:, 0], y_pred[:, 0]
+        ) + w2 * mean_absolute_error(y_true[:, 1], y_pred[:, 1])
+
+    return compute_loss
 
 
 # Define the physics-informed layer as a custom Keras layer
@@ -54,7 +68,10 @@ class PhysicsInformedANN(Model):
         self.dense_out = Dense(units=model_config.dim_out)
         self.compile(
             optimizer=self.optimizer,
-            loss=mean_absolute_error,
+            loss=physics_informed_loss(
+                w1=model_config.loss_w1,
+                w2=model_config.loss_w2,
+            ),
             metrics=model_config.metrics,
         )
 

@@ -21,6 +21,8 @@ class ModelConfig:
     n2: int = 50
     n3: int = 50
     activation: str = "relu"
+    loss_w1: float = 0.5
+    loss_w2: float = 0.5
 
     # 고정 하이퍼파라미터 : 입력/출력층 뉴런 수, 학습 Epoch 수
     dim_out: int = 1
