@@ -146,7 +146,11 @@ def select_top_cases(
 
 
 # Function to plot graphs
-def plot_graphs(pickle_path: Union[str, Path]):
+def plot_graphs(
+    pickle_path: PathLike,
+    ymin: Optional[float] = None,
+    ymax: Optional[float] = None,
+):
     file_stem = Path(pickle_path).stem
     pickle_data: List[PickleHistory] = load_pickle_list(pickle_path)
 
@@ -171,7 +175,10 @@ def plot_graphs(pickle_path: Union[str, Path]):
                 )
 
         # Save the figure
+
         img_filename = Path(pickle_path).parent / f"{file_stem}_{metric}.png"
+        if ymin is not None and ymax is not None:
+            plt.ylim(ymin, ymax)
         plt.savefig(img_filename)
         plt.close()
 
@@ -202,7 +209,7 @@ def plot_metrics(history, metrics):
     plt.show()
 
 
-def plot_loss(
+def plot_val_loss(
     pkl_dir: PathLike,
     save_dir: PathLike,
     ymin: Optional[float] = None,
@@ -224,20 +231,26 @@ def plot_loss(
     for pkl_path in pkl_dir.glob("*.pkl"):
         # 데이터 로드
         data = load_pickle(pkl_path)
-        assert "loss" in data["train_output"], "No loss data"
-        loss = data["train_output"]["loss"]
+        if "train_output" not in data:
+            print(f"Invalid pickle file: {pkl_path}")
+            continue
+
+        assert "val_loss" in data["train_output"], "No val_loss data"
+        loss = data["train_output"]["val_loss"]
 
         # 그래프 그리기
         plt.plot(
             loss,
-            label=f"Loss for {pkl_path.name}" if combined else "Training Loss",
+            label=f"Validation Loss for {pkl_path.name}"
+            if combined
+            else "Training Validation Loss",
             linewidth=0.4,
         )
 
         if not combined:
-            plt.title(f"Epoch vs Loss for {pkl_path.name}")
+            plt.title(f"Epoch vs Validation Loss for {pkl_path.name}")
             plt.xlabel("Epoch")
-            plt.ylabel("Loss")
+            plt.ylabel("Validation Loss")
             if ymin is not None and ymax is not None:
                 plt.ylim(ymin, ymax)
             if xmin is not None and xmax is not None:
@@ -252,9 +265,9 @@ def plot_loss(
             plt.close()
 
     if combined:
-        plt.title("Combined Epoch vs Loss")
+        plt.title("Combined Epoch vs Validation Loss")
         plt.xlabel("Epoch")
-        plt.ylabel("Loss")
+        plt.ylabel("Validation Loss")
         if ymin is not None and ymax is not None:
             plt.ylim(ymin, ymax)
         if xmin is not None and xmax is not None:
@@ -271,7 +284,7 @@ def plot_loss(
         )
 
         # 이미지로 저장
-        save_path = save_dir / "combined_loss.png"
+        save_path = save_dir / "combined_val_loss.png"
         plt.savefig(save_path, bbox_inches="tight")
         plt.close()
 
@@ -287,12 +300,12 @@ if __name__ == "__main__":
     # history = load_pickle(path)["train_output"]
     # plot_metrics(history, ["loss", "mae", "mape", "rmse"])
 
-    plot_loss(
+    plot_val_loss(
         "output",
         "image",
-        ymin=0.4,
-        ymax=0.5,
-        xmin=2000,
+        ymin=0.3,
+        ymax=0.8,
+        xmin=0,
         xmax=20000,
         combined=True,
     )

@@ -1,10 +1,11 @@
 import multiprocessing
 from pathlib import Path
 
-from nn.ann import PhysicsInformedANN
+from nn.ann import ANN
 from nn.config import ModelConfig
 from nn.train import Trainer
 from nn.visualize import plot_graphs
+
 
 if __name__ == "__main__":
     # 모델 및 트레이너에 대한 간단한 설정
@@ -18,11 +19,17 @@ if __name__ == "__main__":
         batch_size=500,
         epochs=20000,
         patience=1000,
+        loss_funcs=["mae", "mae"],
+        loss_weights=[0.5, 0.5],
+        l1_reg=0.01,
+        l2_reg=0.01,
+        dropout_rate=0.5,
+        normalize_layer=True,
     )
     trainer = Trainer(
-        PhysicsInformedANN,
+        ANN,
         model_config,
-        model_name="PIANN",
+        model_name="ANN_RE",
         workers=multiprocessing.cpu_count(),
         use_multiprocessing=False,
     )

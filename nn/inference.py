@@ -1,8 +1,11 @@
+# flake8: noqa
 from pathlib import Path
 from typing import Union
 
 import numpy as np
 from tensorflow import keras
+
+from .ann import ANN
 
 
 def inference(model_path: Union[str, Path]) -> np.ndarray:

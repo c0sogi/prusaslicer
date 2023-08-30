@@ -1,6 +1,7 @@
-from dataclasses import dataclass, field
-from typing import Dict, List
+from dataclasses import dataclass, field, fields
+from typing import Dict, List, Union, get_args
 
+from .losses import LOSS_KEYS
 from .utils.logger import ApiLogger
 
 logger = ApiLogger(__name__)
@@ -21,19 +22,55 @@ class ModelConfig:
     n2: int = 50
     n3: int = 50
     activation: str = "relu"
-    loss_w1: float = 0.5
-    loss_w2: float = 0.5
+    loss_funcs: Union[LOSS_KEYS, List[LOSS_KEYS]] = field(
+        default_factory=lambda: ["mae", "mae"]
+    )
+    loss_weights: List[float] = field(default_factory=lambda: [0.5, 0.5])
+    l1_reg: float = 0.0
+    l2_reg: float = 0.0
+    dropout_rate: float = 0.0
+    normalize_layer: bool = False
 
     # 고정 하이퍼파라미터 : 입력/출력층 뉴런 수, 학습 Epoch 수
-    dim_out: int = 1
+    dim_out: int = 2
     epochs: int = 2000
     batch_size: int = 100
     kfold_splits: int = 6
     patience: int = 1000
 
+    def __post_init__(self) -> None:
+        assert self.dim_out > 0, "출력층 뉴런 수는 0보다 커야 합니다."
+        assert self.epochs > 0, "학습 Epoch 수는 0보다 커야 합니다."
+        assert self.batch_size > 0, "Batch Size는 0보다 커야 합니다."
+        assert self.kfold_splits >= 0, "K-Fold Splits는 0보다 크거나 같아야 합니다."
+        assert self.patience > 0, "Patience는 0보다 커야 합니다."
+        if isinstance(self.loss_funcs, str):
+            assert self.loss_funcs in get_args(
+                LOSS_KEYS
+            ), "잘못된 Loss Function입니다."
+        else:
+            assert all(
+                lf in get_args(LOSS_KEYS) for lf in self.loss_funcs
+            ), "잘못된 Loss Function입니다."
+        assert all(
+            0.0 <= w <= 1.0 for w in self.loss_weights
+        ), "Loss Weights는 0과 1 사이의 값이어야 합니다."
+        self.loss_weights = [
+            w / sum(self.loss_weights) for w in self.loss_weights
+        ]  # Loss weights의 합이 1이 되도록 정규화
+        assert (
+            len(self.loss_weights) == self.dim_out
+        ), "Loss Weights의 길이는 출력층 뉴런 수와 같아야 합니다."
+
     @classmethod
     def from_dict(cls, config_dict: Dict):
-        return cls(**config_dict)
+        return cls(
+            **{
+                k: v
+                for k, v in config_dict.items()
+                if k in {f.name for f in fields(cls)}
+            }
+        )
 
     # # 아래는 자동으로 계산됨
     # number_of_experiments: int = field(init=False, repr=False)

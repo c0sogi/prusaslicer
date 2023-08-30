@@ -1,92 +1,19 @@
 # flake8: noqa
 from dataclasses import asdict
-from typing import Callable, Dict, List, Optional, Union
+from typing import Callable, Dict, List, Literal, Optional, Union
 
 import tensorflow as tf
-from keras import Model, Sequential, initializers
-from keras.layers import Dense, Lambda, Layer
-from keras.losses import Loss, mean_absolute_error
+from keras import Model, Sequential, initializers, losses
+from keras.layers import Dense, Dropout, Lambda, Layer, LayerNormalization
 from keras.optimizers import Adam
+from keras.regularizers import l1_l2
 from keras.src.engine import data_adapter
 
 from .config import ModelConfig
+from .losses import LOSS_FUNC_DICT, weighted_loss
 
 
-def physics_informed_loss(
-    w1: float = 0.5, w2: float = 0.5
-) -> Callable[[tf.Tensor, tf.Tensor], tf.Tensor]:
-    def compute_loss(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
-        # Assuming y_true and y_pred are of shape (batch_size, 2)
-        # and the first column is for mechanical strength and the second column is for printed quality
-        # Compute the loss for each prediction, and combine the losses using the weights
-        return w1 * mean_absolute_error(
-            y_true[:, 0], y_pred[:, 0]
-        ) + w2 * mean_absolute_error(y_true[:, 1], y_pred[:, 1])
-
-    return compute_loss
-
-
-# Define the physics-informed layer as a custom Keras layer
-class PhysicsInformedLayer(Layer):
-    def __init__(
-        self,
-        output_dim: int,
-        **kwargs,
-    ):
-        self.output_dim = output_dim
-
-        super().__init__(**kwargs)
-
-    def build(self, input_shape):
-        self.kernel = self.add_weight(
-            name="kernel",
-            shape=(input_shape[1], self.output_dim),
-            initializer=initializers.RandomNormal(mean=0.0, stddev=1.0),
-            trainable=True,
-        )
-        super().build(input_shape)
-
-    def call(self, inputs: tf.Tensor) -> tf.Tensor:
-        return compute_physics(inputs, self.kernel)  # type: ignore
-
-
-class PhysicsInformedANN(Model):
-    def __init__(self, model_config: ModelConfig, **kwargs):
-        # Define model parameters
-        self.model_config = model_config
-        super().__init__(**kwargs)
-
-        # Define optimizer
-        self.optimizer = Adam(learning_rate=model_config.lr)
-
-        # Define layers
-        activation = model_config.activation
-        self.physics_layer = PhysicsInformedLayer(model_config.dim_out)
-        self.dense1 = Dense(units=model_config.n1, activation=activation)
-        self.dense2 = Dense(units=model_config.n2, activation=activation)
-        self.dense3 = Dense(units=model_config.n3, activation=activation)
-        self.dense_out = Dense(units=model_config.dim_out)
-        self.compile(
-            optimizer=self.optimizer,
-            loss=physics_informed_loss(
-                w1=model_config.loss_w1,
-                w2=model_config.loss_w2,
-            ),
-            metrics=model_config.metrics,
-        )
-
-    def call(self, inputs: tf.Tensor) -> tf.Tensor:
-        # Combine the physics-informed output and the neural network output
-        return self.physics_layer(inputs) + self.dense_out(  # type: ignore
-            self.dense3(
-                self.dense2(
-                    self.dense1(
-                        inputs,
-                    )
-                )
-            )
-        )
-
+class ModelFrame(Model):
     def train_step(
         self, data: tf.Tensor
     ) -> Dict[str, Union[float, tf.Tensor]]:
@@ -123,6 +50,156 @@ class PhysicsInformedANN(Model):
             model_config=ModelConfig.from_dict(config.pop("model_config")),
             **config,
         )
+
+
+class ANN(ModelFrame):
+    def __init__(self, model_config: ModelConfig, **kwargs):
+        # Define model parameters
+        self.model_config = model_config
+        super().__init__(**kwargs)
+
+        # Define optimizer
+        self.optimizer = Adam(learning_rate=model_config.lr)
+
+        # Define regularization
+        if model_config.l1_reg is None or model_config.l2_reg is None:
+            kernel_regularizer = None
+        else:
+            kernel_regularizer = l1_l2(
+                l1=model_config.l1_reg, l2=model_config.l2_reg
+            )
+
+        # Define layers
+        activation = model_config.activation
+        self.dense1 = Dense(
+            units=model_config.n1,
+            activation=activation,
+            kernel_regularizer=kernel_regularizer,
+        )
+        self.norm1 = (
+            LayerNormalization() if model_config.normalize_layer else None
+        )
+        self.dropout1 = (
+            Dropout(model_config.dropout_rate)
+            if model_config.dropout_rate
+            else None
+        )
+
+        self.dense2 = Dense(
+            units=model_config.n2,
+            activation=activation,
+            kernel_regularizer=kernel_regularizer,
+        )
+        self.norm2 = (
+            LayerNormalization() if model_config.normalize_layer else None
+        )
+        self.dropout2 = (
+            Dropout(model_config.dropout_rate)
+            if model_config.dropout_rate
+            else None
+        )
+        self.dense3 = Dense(
+            units=model_config.n3,
+            activation=activation,
+            kernel_regularizer=kernel_regularizer,
+        )
+        self.norm3 = (
+            LayerNormalization() if model_config.normalize_layer else None
+        )
+        self.dropout3 = (
+            Dropout(model_config.dropout_rate)
+            if model_config.dropout_rate
+            else None
+        )
+        self.dense_out = Dense(units=model_config.dim_out)
+        self.compile(
+            optimizer=self.optimizer,
+            loss=weighted_loss(
+                *model_config.loss_weights,
+                loss_funcs=model_config.loss_funcs,
+            ),
+            metrics=model_config.metrics,
+        )
+
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        x = self.dense1(inputs)
+        if self.norm1 is not None:
+            x = self.norm1(x)
+        if self.dropout1 is not None:
+            x = self.dropout1(x)
+        x = self.dense2(x)
+        if self.norm2 is not None:
+            x = self.norm2(x)
+        if self.dropout2 is not None:
+            x = self.dropout2(x)
+        x = self.dense3(x)
+        if self.norm3 is not None:
+            x = self.norm3(x)
+        if self.dropout3 is not None:
+            x = self.dropout3(x)
+        return self.dense_out(x)  # type: ignore
+
+
+class PhysicsInformedANN(ModelFrame):
+    def __init__(self, model_config: ModelConfig, **kwargs):
+        # Define model parameters
+        self.model_config = model_config
+        super().__init__(**kwargs)
+
+        # Define optimizer
+        self.optimizer = Adam(learning_rate=model_config.lr)
+
+        # Define layers
+        activation = model_config.activation
+        # self.physics_layer = PhysicsInformedLayer(model_config.dim_out)
+        self.dense1 = Dense(units=model_config.n1, activation=activation)
+        self.dense2 = Dense(units=model_config.n2, activation=activation)
+        self.dense3 = Dense(units=model_config.n3, activation=activation)
+        self.dense_out = Dense(units=model_config.dim_out)
+        self.compile(
+            optimizer=self.optimizer,
+            loss=weighted_loss(
+                *model_config.loss_weights,
+                loss_funcs=model_config.loss_funcs,
+            ),
+            metrics=model_config.metrics,
+        )
+
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        # Combine the physics-informed output and the neural network output
+        return self.dense_out(  # type: ignore
+            self.dense3(
+                self.dense2(
+                    self.dense1(
+                        inputs,
+                    )
+                )
+            )
+        )
+
+
+# Define the physics-informed layer as a custom Keras layer
+class PhysicsInformedLayer(Layer):
+    def __init__(
+        self,
+        output_dim: int,
+        **kwargs,
+    ):
+        self.output_dim = output_dim
+
+        super().__init__(**kwargs)
+
+    def build(self, input_shape):
+        self.kernel = self.add_weight(
+            name="kernel",
+            shape=(input_shape[1], self.output_dim),
+            initializer=initializers.RandomNormal(mean=0.0, stddev=1.0),
+            trainable=True,
+        )
+        super().build(input_shape)
+
+    def call(self, inputs: tf.Tensor) -> tf.Tensor:
+        return compute_physics(inputs, self.kernel)  # type: ignore
 
 
 def compute_physics(inputs: tf.Tensor, kernel: tf.Tensor) -> tf.Tensor:
@@ -169,6 +246,41 @@ def compute_physics(inputs: tf.Tensor, kernel: tf.Tensor) -> tf.Tensor:
     outputs = tf.matmul(inputs_float, masked_kernel)
     return outputs
 
+
+# class ANN(ModelFrame):
+#     def __init__(self, model_config: ModelConfig, **kwargs):
+#         # Define model parameters
+#         self.model_config = model_config
+#         super().__init__(**kwargs)
+
+#         # Define optimizer
+#         self.optimizer = Adam(learning_rate=model_config.lr)
+
+#         # Define layers
+#         activation = model_config.activation
+#         self.dense1 = Dense(units=model_config.n1, activation=activation)
+#         self.dense2 = Dense(units=model_config.n2, activation=activation)
+#         self.dense3 = Dense(units=model_config.n3, activation=activation)
+#         self.dense_out = Dense(units=model_config.dim_out)
+#         self.compile(
+#             optimizer=self.optimizer,
+#             loss=weighted_loss(
+#                 *model_config.loss_weights,
+#                 loss_funcs=model_config.loss_funcs,
+#             ),
+#             metrics=model_config.metrics,
+#         )
+
+#     def call(self, inputs: tf.Tensor) -> tf.Tensor:
+#         return self.dense_out(  # type: ignore
+#             self.dense3(
+#                 self.dense2(
+#                     self.dense1(
+#                         inputs,
+#                     )
+#                 )
+#             )
+#         )
 
 # def compute_physics(inputs: tf.Tensor, kernel: tf.Tensor) -> tf.Tensor:
 #     """1. **bed_temp (Bed Temperature)**:
@@ -268,38 +380,6 @@ def compute_physics(inputs: tf.Tensor, kernel: tf.Tensor) -> tf.Tensor:
 #     # Combine the results into a single tensor with shape (None, 2)
 #     output = tf.concat([mechanical_strength, printed_quality], axis=1)
 #     return output  # type: ignore
-
-
-class ANN(Sequential):
-    def __init__(
-        self,
-        model_config: Optional[ModelConfig] = None,
-        n1: Optional[int] = None,
-        n2: Optional[int] = None,
-        n3: Optional[int] = None,
-        lr: Optional[float] = None,
-        activation: str = "relu",
-        **kwargs,
-    ) -> None:
-        super().__init__(**kwargs)
-        if (
-            model_config is not None
-            and n1 is not None
-            and n2 is not None
-            and n3 is not None
-            and lr is not None
-        ):
-            self.optimizer = Adam(learning_rate=lr)
-            self.add(Dense(units=n1, activation=activation))
-            self.add(Dense(units=n2, activation=activation))
-            self.add(Dense(units=n3, activation=activation))
-            self.add(Dense(units=model_config.dim_out))
-
-            self.compile(
-                optimizer=self.optimizer,
-                loss=mean_absolute_error,
-                metrics=model_config.metrics,
-            )
 
 
 # # Utility function to compute the physics-informed mechanical strength
