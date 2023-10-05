@@ -301,9 +301,9 @@ if __name__ == "__main__":
     # plot_metrics(history, ["loss", "mae", "mape", "rmse"])
 
     plot_val_loss(
-        "output",
-        "image",
-        ymin=0.3,
+        "output_ann_re",
+        "image_ann_re",
+        ymin=0.0,
         ymax=0.8,
         xmin=0,
         xmax=20000,

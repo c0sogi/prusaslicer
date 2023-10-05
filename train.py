@@ -18,20 +18,20 @@ if __name__ == "__main__":
         print_per_epoch=100,
         batch_size=500,
         epochs=20000,
-        patience=1000,
+        patience=2000,
         loss_funcs=["mae", "mae"],
         loss_weights=[0.5, 0.5],
-        l1_reg=0.01,
-        l2_reg=0.01,
-        dropout_rate=0.5,
+        # l1_reg=0.01,
+        # l2_reg=0.01,
+        dropout_rate=0.2,
         normalize_layer=True,
     )
     trainer = Trainer(
         ANN,
         model_config,
-        model_name="ANN_RE",
+        model_name="ANTI_OVERFIT_ANN",
         workers=multiprocessing.cpu_count(),
-        use_multiprocessing=False,
+        use_multiprocessing=True,
     )
     trainer.hyper_train(
         {

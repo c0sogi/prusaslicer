@@ -75,6 +75,7 @@ def weighted_loss(
         lfs
     ), "The number of loss weights must equal the number of loss functions"
 
+    @tf.keras.utils.register_keras_serializable()
     def compute_loss(y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
         for i, (w, lf) in enumerate(zip(loss_weights, lfs)):
             if i == 0:

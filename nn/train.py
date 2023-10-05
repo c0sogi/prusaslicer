@@ -7,6 +7,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from time import sleep
 from typing import Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
@@ -105,7 +106,7 @@ class Trainer:
         model, pickle_history = self.create_model_and_history(
             model_config, hyper_params, kfold_case
         )
-        if self.get_current_epoch(pickle_history) >= model_config.epochs:
+        if self.get_current_epoch(pickle_history) > 0:
             logger.info(f"Already trained. Skipping...")
             return pickle_history
 
