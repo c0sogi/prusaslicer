@@ -2,7 +2,7 @@ from typing import Dict, Iterable, List, Literal, TypedDict, Union, get_args
 
 from typing_extensions import NotRequired
 
-from .config import ModelConfig
+from .config import BaseModelConfig
 
 
 HyperParamValue = Union[int, float]
@@ -10,7 +10,7 @@ HyperParamsDict = Dict[str, HyperParamValue]
 HyperParamsDictAll = Dict[str, Iterable[HyperParamValue]]
 
 
-InputParams = Literal[
+ANNInputParams = Literal[
     "bedtemp",
     "exttemp",
     "layerthickness",
@@ -23,7 +23,7 @@ InputParams = Literal[
     "linearthermalexpansioncoefficient",
 ]
 
-OutputParams = Literal[
+ANNOutputParams = Literal[
     "weight",
     "width1",
     "width2",
@@ -35,24 +35,27 @@ OutputParams = Literal[
 ]
 
 
-INPUT_PARAM_ARGS = get_args(InputParams)
-INPUT_PARAM_INDICES = (
-    INPUT_PARAM_ARGS.index("bedtemp"),
-    INPUT_PARAM_ARGS.index("exttemp"),
-    INPUT_PARAM_ARGS.index("layerthickness"),
-    INPUT_PARAM_ARGS.index("infillspeed"),
-    INPUT_PARAM_ARGS.index("density"),
-    INPUT_PARAM_ARGS.index("thermalresistance"),
-    INPUT_PARAM_ARGS.index("impactstrength"),
-    INPUT_PARAM_ARGS.index("glasstransitiontemp"),
-    INPUT_PARAM_ARGS.index("thermalconductivity"),
-    INPUT_PARAM_ARGS.index("linearthermalexpansioncoefficient"),
+ANN_INPUT_PARAM_ARGS = get_args(ANNInputParams)
+ANN_INPUT_PARAM_INDICES = (
+    ANN_INPUT_PARAM_ARGS.index("bedtemp"),
+    ANN_INPUT_PARAM_ARGS.index("exttemp"),
+    ANN_INPUT_PARAM_ARGS.index("layerthickness"),
+    ANN_INPUT_PARAM_ARGS.index("infillspeed"),
+    ANN_INPUT_PARAM_ARGS.index("density"),
+    ANN_INPUT_PARAM_ARGS.index("thermalresistance"),
+    ANN_INPUT_PARAM_ARGS.index("impactstrength"),
+    ANN_INPUT_PARAM_ARGS.index("glasstransitiontemp"),
+    ANN_INPUT_PARAM_ARGS.index("thermalconductivity"),
+    ANN_INPUT_PARAM_ARGS.index("linearthermalexpansioncoefficient"),
 )
+
+CNNInputParams = Literal["변형율"]
+CNNOutputParams = Literal["강도"]
 
 
 class TrainInput(TypedDict):
     hyper_params: HyperParamsDict
-    config: ModelConfig
+    config: BaseModelConfig
 
 
 class TrainOutput(TypedDict):

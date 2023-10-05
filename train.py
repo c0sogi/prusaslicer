@@ -1,54 +1,87 @@
+# flake8: noqa
 import multiprocessing
+from datetime import datetime
 from pathlib import Path
 
 from nn.ann import ANN
-from nn.config import ModelConfig
+from nn.cnn import CNN
+from nn.config import ANNModelConfig, CNNModelConfig
+from nn.dataloader import DataLoaderANN, DataLoaderCNN
 from nn.train import Trainer
 from nn.visualize import plot_graphs
 
-
 if __name__ == "__main__":
     # 모델 및 트레이너에 대한 간단한 설정
-    model_config = ModelConfig(
+    ann_model_config = ANNModelConfig(
         input_path="./raw_data.csv",
-        output_path="./output",
+        output_path=f"./{datetime.now().strftime('%Y%m%d%H%M')}",
         metrics=["mse", "mae", "mape"],
-        dim_out=2,
         kfold_splits=0,
         print_per_epoch=100,
-        batch_size=500,
+        batch_size=100,
         epochs=20000,
-        patience=2000,
+        patience=1000,
         loss_funcs=["mae", "mae"],
         loss_weights=[0.5, 0.5],
-        # l1_reg=0.01,
-        # l2_reg=0.01,
-        dropout_rate=0.2,
-        normalize_layer=True,
+        l1_reg=None,
+        l2_reg=None,
+        dropout_rate=0.0,
+        normalize_layer=False,
+        dim_out=2,
     )
-    trainer = Trainer(
-        ANN,
-        model_config,
-        model_name="ANTI_OVERFIT_ANN",
+    cnn_model_config = CNNModelConfig(
+        input_path="./raw_data.csv",
+        output_path=f"./{datetime.now().strftime('%Y%m%d%H%M')}",
+        metrics=["mse", "mae", "mape"],
+        kfold_splits=0,
+        print_per_epoch=100,
+        batch_size=100,
+        epochs=20000,
+        patience=1000,
+        loss_funcs=["mae", "mae"],
+        loss_weights=[0.5, 0.5],
+        l1_reg=None,
+        l2_reg=None,
+        dropout_rate=0.0,
+        normalize_layer=False,
+        dim_out=2,
+    )
+    ann_all_hyper_params = {
+        "lr": (0.001, 0.005, 0.01),
+        "n1": (20, 30, 40),
+        "n2": (10, 20, 30),
+        "n3": (5, 10, 15, 20),
+    }
+    cnn_all_hyper_params = {
+        "lr": (0.001, 0.005, 0.01),
+        "n1": (20, 30, 40),
+        "n2": (10, 20, 30),
+        "n3": (5, 10, 15, 20),
+    }
+
+    # 실제 학습
+    ann_trainer = Trainer(
+        data_loader_class=DataLoaderANN,
+        model_class=ANN,
+        model_name=ANN.__name__,
+        model_config=ann_model_config,
         workers=multiprocessing.cpu_count(),
         use_multiprocessing=True,
     )
-    trainer.hyper_train(
-        {
-            "lr": (0.001, 0.005, 0.01),
-            "n1": (20, 30, 40),
-            "n2": (10, 20, 30),
-            "n3": (5, 10, 15, 20),
-        },
+    cnn_trainer = Trainer(
+        data_loader_class=DataLoaderCNN,
+        model_class=CNN,
+        model_name=CNN.__name__,
+        model_config=cnn_model_config,
+        workers=multiprocessing.cpu_count(),
+        use_multiprocessing=True,
     )
-
-    # 로스 그래프 그리기
-    for pickle_path in Path("output").glob("*.pkl"):
-        if "[" in pickle_path.name and "]" in pickle_path.name:
-            continue
-        plot_graphs(pickle_path)
-    # trainer.train(hyper_params={"lr": 0.001, "n1": 60, "n2": 50})
-
+    ann_trainer.hyper_train(ann_all_hyper_params)
+    cnn_trainer.hyper_train(cnn_all_hyper_params)
+    # for pickle_path in Path("output").glob("*.pkl"):
+    #     if "[" in pickle_path.name and "]" in pickle_path.name:
+    #         continue
+    #     plot_graphs(pickle_path)
     # "lr": (0.001, 0.005, 0.01),
     # "n1": (60, 70, 80, 90, 100, 110, 120, 130),
     # "n2": (50, 60, 70, 80, 90, 100, 110),

@@ -17,8 +17,14 @@ from sklearn.model_selection import train_test_split
 from tensorflow import keras
 
 from .callbacks import AccuracyPerEpoch, EarlyStopping
-from .config import ModelConfig
-from .dataloader import DataLoader, dump_pickle, load_pickle
+from .config import BaseModelConfig
+from .dataloader import (
+    BaseDataLoader,
+    DataLoaderANN,
+    DataLoaderCNN,
+    dump_pickle,
+    load_pickle,
+)
 from .schemas import (
     HyperParamsDict,
     HyperParamsDictAll,
@@ -33,15 +39,16 @@ logger = ApiLogger(__name__)
 
 @dataclass
 class Trainer:
+    data_loader_class: Type[BaseDataLoader]
     model_class: Type[keras.Model]
-    model_config: ModelConfig
+    model_config: BaseModelConfig
     model_name: Optional[str] = None
     workers: int = multiprocessing.cpu_count()
     use_multiprocessing: bool = True
 
     def __post_init__(self) -> None:
         self._model_name = self.model_name or str(self.model_class.__name__)
-        self._data_loader = DataLoader(self.model_config)
+        self._data_loader = self.data_loader_class(self.model_config)
 
     @property
     def train_data(self) -> pd.DataFrame:
@@ -204,7 +211,7 @@ class Trainer:
 
     def create_model_and_history(
         self,
-        model_config: ModelConfig,
+        model_config: BaseModelConfig,
         hyper_params: Optional[HyperParamsDict] = None,
         kfold_case: Optional[int] = None,
     ) -> Tuple[keras.Model, PickleHistory]:
@@ -262,7 +269,7 @@ class Trainer:
 
     def apply_hyper_params(
         self, hyper_params: Optional[HyperParamsDict] = None
-    ) -> ModelConfig:
+    ) -> BaseModelConfig:
         model_config = deepcopy(self.model_config)
         if hyper_params is not None:
             for key, value in hyper_params.items():
@@ -273,7 +280,9 @@ class Trainer:
         return model_config
 
     @staticmethod
-    def get_train_output(hist_history: Dict[str, List[float]]) -> TrainOutput:
+    def get_train_output(
+        hist_history: Dict[str, List[float]]
+    ) -> TrainOutput:
         if "mse" in hist_history:
             hist_history["rmse"] = np.sqrt(hist_history["mse"]).tolist()
             hist_history.pop("mse")

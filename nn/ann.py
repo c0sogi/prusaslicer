@@ -9,7 +9,7 @@ from keras.optimizers import Adam
 from keras.regularizers import l1_l2
 from keras.src.engine import data_adapter
 
-from .config import ModelConfig
+from .config import BaseModelConfig, ANNModelConfig
 from .losses import LOSS_FUNC_DICT, weighted_loss
 
 
@@ -47,13 +47,15 @@ class ModelFrame(Model):
     @classmethod
     def from_config(cls, config):
         return cls(
-            model_config=ModelConfig.from_dict(config.pop("model_config")),
+            model_config=ANNModelConfig.from_dict(
+                config.pop("model_config")
+            ),
             **config,
         )
 
 
 class ANN(ModelFrame):
-    def __init__(self, model_config: ModelConfig, **kwargs):
+    def __init__(self, model_config: ANNModelConfig, **kwargs):
         # Define model parameters
         self.model_config = model_config
         super().__init__(**kwargs)
@@ -141,7 +143,7 @@ class ANN(ModelFrame):
 
 
 class PhysicsInformedANN(ModelFrame):
-    def __init__(self, model_config: ModelConfig, **kwargs):
+    def __init__(self, model_config: ANNModelConfig, **kwargs):
         # Define model parameters
         self.model_config = model_config
         super().__init__(**kwargs)
@@ -237,7 +239,9 @@ def compute_physics(inputs: tf.Tensor, kernel: tf.Tensor) -> tf.Tensor:
     mask_printed_quality = tf.constant(
         [1.0, 1.0, 1.0, 0.8, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0], shape=(10, 1)
     )
-    mask = tf.concat([mask_mechanical_strength, mask_printed_quality], axis=1)
+    mask = tf.concat(
+        [mask_mechanical_strength, mask_printed_quality], axis=1
+    )
 
     # Element-wise multiply the kernel with the mask
     masked_kernel = kernel * mask

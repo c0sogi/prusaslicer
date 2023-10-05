@@ -1,5 +1,6 @@
+from keras.src import activations
 from dataclasses import dataclass, field, fields
-from typing import Dict, List, Union, get_args
+from typing import Dict, List, Optional, Union, get_args
 
 from .losses import LOSS_KEYS
 from .utils.logger import ApiLogger
@@ -8,37 +9,43 @@ logger = ApiLogger(__name__)
 
 
 @dataclass
-class ModelConfig:
+class BaseModelConfig:
     # 기본 설정
     seed: int = 777
     print_per_epoch: int = 100
     input_path: str = "./raw_data.csv"
     output_path: str = "./output"
-    metrics: List[str] = field(default_factory=lambda: ["mse", "mae", "mape"])
-
-    # 하이퍼파라미터
-    lr: float = 0.001
-    n1: int = 60
-    n2: int = 50
-    n3: int = 50
-    activation: str = "relu"
-    loss_funcs: Union[LOSS_KEYS, List[LOSS_KEYS]] = field(
-        default_factory=lambda: ["mae", "mae"]
+    metrics: List[str] = field(
+        default_factory=lambda: ["mse", "mae", "mape"]
     )
-    loss_weights: List[float] = field(default_factory=lambda: [0.5, 0.5])
-    l1_reg: float = 0.0
-    l2_reg: float = 0.0
-    dropout_rate: float = 0.0
-    normalize_layer: bool = False
-
-    # 고정 하이퍼파라미터 : 입력/출력층 뉴런 수, 학습 Epoch 수
-    dim_out: int = 2
     epochs: int = 2000
     batch_size: int = 100
     kfold_splits: int = 6
     patience: int = 1000
+    dim_out: int = 2
+
+    # 하이퍼파라미터
+    lr: float = 0.001
+    loss_funcs: Union[LOSS_KEYS, List[LOSS_KEYS]] = field(
+        default_factory=lambda: ["mae", "mae"]
+    )
+    loss_weights: List[float] = field(default_factory=lambda: [0.5, 0.5])
+    activation: str = "relu"
+
+    # Overfitting 방지
+    l1_reg: Optional[float] = None
+    l2_reg: Optional[float] = None
+    dropout_rate: float = 0.0
+    normalize_layer: bool = False
 
     def __post_init__(self) -> None:
+        try:
+            activations.get(self.activation)
+        except Exception as e:
+            raise ValueError(
+                f"{self.activation}은 잘못된 Activation Function입니다: {e}"
+            )
+
         assert self.dim_out > 0, "출력층 뉴런 수는 0보다 커야 합니다."
         assert self.epochs > 0, "학습 Epoch 수는 0보다 커야 합니다."
         assert self.batch_size > 0, "Batch Size는 0보다 커야 합니다."
@@ -71,6 +78,20 @@ class ModelConfig:
                 if k in {f.name for f in fields(cls)}
             }
         )
+
+
+@dataclass
+class ANNModelConfig(BaseModelConfig):
+    n1: int = 60
+    n2: int = 50
+    n3: int = 50
+
+
+@dataclass
+class CNNModelConfig(BaseModelConfig):
+    k1: int = 60
+    k2: int = 50
+    k3: int = 50
 
     # # 아래는 자동으로 계산됨
     # number_of_experiments: int = field(init=False, repr=False)
