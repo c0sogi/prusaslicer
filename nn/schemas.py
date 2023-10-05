@@ -1,4 +1,4 @@
-from typing import Dict, Iterable, List, Literal, TypedDict, Union, get_args
+from typing import Dict, Iterable, List, Literal, TypedDict, Union
 
 from typing_extensions import NotRequired
 
@@ -35,22 +35,22 @@ ANNOutputParams = Literal[
 ]
 
 
-_ANN_INPUT_PARAM_ARGS = get_args(ANNInputParams)
-ANN_INPUT_PARAM_INDICES = (
-    _ANN_INPUT_PARAM_ARGS.index("bedtemp"),
-    _ANN_INPUT_PARAM_ARGS.index("exttemp"),
-    _ANN_INPUT_PARAM_ARGS.index("layerthickness"),
-    _ANN_INPUT_PARAM_ARGS.index("infillspeed"),
-    _ANN_INPUT_PARAM_ARGS.index("density"),
-    _ANN_INPUT_PARAM_ARGS.index("thermalresistance"),
-    _ANN_INPUT_PARAM_ARGS.index("impactstrength"),
-    _ANN_INPUT_PARAM_ARGS.index("glasstransitiontemp"),
-    _ANN_INPUT_PARAM_ARGS.index("thermalconductivity"),
-    _ANN_INPUT_PARAM_ARGS.index("linearthermalexpansioncoefficient"),
-)
+# _ANN_INPUT_PARAM_ARGS = get_args(ANNInputParams)
+# ANN_INPUT_PARAM_INDICES = (
+#     _ANN_INPUT_PARAM_ARGS.index("bedtemp"),
+#     _ANN_INPUT_PARAM_ARGS.index("exttemp"),
+#     _ANN_INPUT_PARAM_ARGS.index("layerthickness"),
+#     _ANN_INPUT_PARAM_ARGS.index("infillspeed"),
+#     _ANN_INPUT_PARAM_ARGS.index("density"),
+#     _ANN_INPUT_PARAM_ARGS.index("thermalresistance"),
+#     _ANN_INPUT_PARAM_ARGS.index("impactstrength"),
+#     _ANN_INPUT_PARAM_ARGS.index("glasstransitiontemp"),
+#     _ANN_INPUT_PARAM_ARGS.index("thermalconductivity"),
+#     _ANN_INPUT_PARAM_ARGS.index("linearthermalexpansioncoefficient"),
+# )
 
-CNNInputParams = Literal["변형율"]
-CNNOutputParams = Literal["강도"]
+LSTMInputParams = Literal["변형율"]
+LSTMOutputParams = Literal["강도"]
 
 
 class TrainInput(TypedDict):

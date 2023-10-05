@@ -88,10 +88,11 @@ class ANNModelConfig(BaseModelConfig):
 
 
 @dataclass
-class CNNModelConfig(BaseModelConfig):
-    k1: int = 60
-    k2: int = 50
-    k3: int = 50
+class LSTMModelConfig(BaseModelConfig):
+    material_properties_dim: int = -1
+    max_sequence_length: int = -1
+    encoder_lstm_units: int = -1
+    decoder_lstm_units: int = -1
 
     # # 아래는 자동으로 계산됨
     # number_of_experiments: int = field(init=False, repr=False)

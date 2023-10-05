@@ -4,9 +4,9 @@ from datetime import datetime
 from pathlib import Path
 
 from nn.ann import ANN
-from nn.cnn import CNN
-from nn.config import ANNModelConfig, CNNModelConfig
-from nn.dataloader import DataLoaderANN, DataLoaderCNN
+from nn.lstm import LSTM
+from nn.config import ANNModelConfig, LSTMModelConfig
+from nn.dataloader import DataLoaderANN, DataLoaderLSTM
 from nn.train import Trainer
 from nn.visualize import plot_graphs
 
@@ -29,7 +29,7 @@ if __name__ == "__main__":
         normalize_layer=False,
         dim_out=2,
     )
-    cnn_model_config = CNNModelConfig(
+    lstm_model_config = LSTMModelConfig(
         input_path="./raw_data.csv",
         output_path=f"./{datetime.now().strftime('%Y%m%d%H%M')}",
         metrics=["mse", "mae", "mape"],
@@ -52,7 +52,7 @@ if __name__ == "__main__":
         "n2": (10, 20, 30),
         "n3": (5, 10, 15, 20),
     }
-    cnn_all_hyper_params = {
+    lstm_all_hyper_params = {
         "lr": (0.001, 0.005, 0.01),
         "n1": (20, 30, 40),
         "n2": (10, 20, 30),

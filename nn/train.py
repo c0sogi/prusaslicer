@@ -21,7 +21,7 @@ from .config import BaseModelConfig
 from .dataloader import (
     BaseDataLoader,
     DataLoaderANN,
-    DataLoaderCNN,
+    DataLoaderLSTM,
     dump_pickle,
     load_pickle,
 )

@@ -25,8 +25,8 @@ from .config import BaseModelConfig
 from .schemas import (
     ANNInputParams,
     ANNOutputParams,
-    CNNInputParams,
-    CNNOutputParams,
+    LSTMInputParams,
+    LSTMOutputParams,
     PickleHistory,
 )
 
@@ -87,12 +87,6 @@ class BaseDataLoader:
             self.input_data.shape[0] == self.output_data.shape[0]
         ), "데이터 개수 불일치"
 
-        logger.debug(
-            f"===== Input Data: {self.input_data.shape} =====\n{self.input_data.head(3)}"  # noqa: E501
-        )
-        logger.debug(
-            f"===== Output Data: {self.output_data.shape} =====\n{self.output_data.head(3)}"  # noqa: E501
-        )
         x_params = list(get_args(self.input_params_type))
         x_columns: List[str] = self.input_data.columns.tolist()
         y_params = list(get_args(self.output_params_type))
@@ -100,7 +94,7 @@ class BaseDataLoader:
         assert isinstance(x_columns, list) and isinstance(y_columns, list)
         assert set(x_params) == set(x_columns), f"{x_columns} != {x_params}"
         assert set(y_params) == set(y_columns), f"{y_columns} != {y_params}"
-        self.output_column_names = y_columns
+
         self.train_data = pd.concat(
             [self.get_input_data(column_name) for column_name in x_columns],
             axis=1,
@@ -109,6 +103,13 @@ class BaseDataLoader:
             [self.get_input_data(column_name) for column_name in y_columns],
             axis=1,
         ).astype(float)
+
+        logger.debug(
+            f"===== Input Data: {self.input_data.shape} =====\n{self.input_data.head(3)}"  # noqa: E501
+        )
+        logger.debug(
+            f"===== Output Data: {self.output_data.shape} =====\n{self.output_data.head(3)}"  # noqa: E501
+        )
         logger.debug(f"===== Train Data: {self.train_data.shape} =====")
         logger.debug(self.train_data.head(48))
         logger.debug(f"===== Train Label: {self.train_label.shape} =====")
@@ -160,9 +161,9 @@ class DataLoaderANN(BaseDataLoader):
 
 
 @dataclass
-class DataLoaderCNN(BaseDataLoader):
+class DataLoaderLSTM(BaseDataLoader):
     raw_data_reader: Callable[
         [os.PathLike], Tuple[pd.DataFrame, pd.DataFrame]
     ] = read_overall_table
-    input_params_type: Type = CNNInputParams
-    output_params_type: Type = CNNOutputParams
+    input_params_type: Type = LSTMInputParams
+    output_params_type: Type = LSTMOutputParams
