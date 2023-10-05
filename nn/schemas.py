@@ -24,29 +24,29 @@ ANNInputParams = Literal[
 ]
 
 ANNOutputParams = Literal[
-    "weight",
-    "width1",
-    "width2",
-    "width3",
-    "height",
-    "depth",
+    # "weight",
+    # "width1",
+    # "width2",
+    # "width3",
+    # "height",
+    # "depth",
     "strength",
     "lengthavg",
 ]
 
 
-ANN_INPUT_PARAM_ARGS = get_args(ANNInputParams)
+_ANN_INPUT_PARAM_ARGS = get_args(ANNInputParams)
 ANN_INPUT_PARAM_INDICES = (
-    ANN_INPUT_PARAM_ARGS.index("bedtemp"),
-    ANN_INPUT_PARAM_ARGS.index("exttemp"),
-    ANN_INPUT_PARAM_ARGS.index("layerthickness"),
-    ANN_INPUT_PARAM_ARGS.index("infillspeed"),
-    ANN_INPUT_PARAM_ARGS.index("density"),
-    ANN_INPUT_PARAM_ARGS.index("thermalresistance"),
-    ANN_INPUT_PARAM_ARGS.index("impactstrength"),
-    ANN_INPUT_PARAM_ARGS.index("glasstransitiontemp"),
-    ANN_INPUT_PARAM_ARGS.index("thermalconductivity"),
-    ANN_INPUT_PARAM_ARGS.index("linearthermalexpansioncoefficient"),
+    _ANN_INPUT_PARAM_ARGS.index("bedtemp"),
+    _ANN_INPUT_PARAM_ARGS.index("exttemp"),
+    _ANN_INPUT_PARAM_ARGS.index("layerthickness"),
+    _ANN_INPUT_PARAM_ARGS.index("infillspeed"),
+    _ANN_INPUT_PARAM_ARGS.index("density"),
+    _ANN_INPUT_PARAM_ARGS.index("thermalresistance"),
+    _ANN_INPUT_PARAM_ARGS.index("impactstrength"),
+    _ANN_INPUT_PARAM_ARGS.index("glasstransitiontemp"),
+    _ANN_INPUT_PARAM_ARGS.index("thermalconductivity"),
+    _ANN_INPUT_PARAM_ARGS.index("linearthermalexpansioncoefficient"),
 )
 
 CNNInputParams = Literal["변형율"]

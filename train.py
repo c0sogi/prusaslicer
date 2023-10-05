@@ -68,16 +68,16 @@ if __name__ == "__main__":
         workers=multiprocessing.cpu_count(),
         use_multiprocessing=True,
     )
-    cnn_trainer = Trainer(
-        data_loader_class=DataLoaderCNN,
-        model_class=CNN,
-        model_name=CNN.__name__,
-        model_config=cnn_model_config,
-        workers=multiprocessing.cpu_count(),
-        use_multiprocessing=True,
-    )
+    # cnn_trainer = Trainer(
+    #     data_loader_class=DataLoaderCNN,
+    #     model_class=CNN,
+    #     model_name=CNN.__name__,
+    #     model_config=cnn_model_config,
+    #     workers=multiprocessing.cpu_count(),
+    #     use_multiprocessing=True,
+    # )
     ann_trainer.hyper_train(ann_all_hyper_params)
-    cnn_trainer.hyper_train(cnn_all_hyper_params)
+    # cnn_trainer.hyper_train(cnn_all_hyper_params)
     # for pickle_path in Path("output").glob("*.pkl"):
     #     if "[" in pickle_path.name and "]" in pickle_path.name:
     #         continue
