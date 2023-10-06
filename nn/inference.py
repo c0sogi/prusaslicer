@@ -16,24 +16,17 @@ def inference(
     if model is None:
         raise ValueError(f"Model not found: {model_path}")
 
-    # 모델 구조 출력
-    model.summary()
-    keras.utils.plot_model(
-        model,
-        to_file=str(Path(model_path).with_suffix(".png")),
-        show_shapes=True,
-        show_layer_names=True,
-    )
+    # # 모델 구조 출력
+    # model.summary()
+    # keras.utils.plot_model(
+    #     model,
+    #     to_file=str(Path(model_path).with_suffix(".png")),
+    #     show_shapes=True,
+    #     show_layer_names=True,
+    # )
 
     # Inference 수행
-    predictions = model.predict(input_data)
-    print(
-        f"{type(model)} Predictions for {Path(model_path).name}:",
-        predictions,
-        predictions.shape,
-        type(predictions),
-    )
-    return predictions
+    return model.predict(input_data)
 
 
 if __name__ == "__main__":

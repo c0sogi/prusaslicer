@@ -3,8 +3,6 @@ import multiprocessing
 import unittest
 from uuid import uuid4
 
-import numpy as np
-
 from nn.ann import ANN
 from nn.config import ANNModelConfig
 from nn.dataloader import DataLoaderANN
@@ -47,11 +45,9 @@ class TestANN(unittest.TestCase):
             workers=multiprocessing.cpu_count(),
             use_multiprocessing=True,
         )
+        x_test = ann_trainer.train_data.iloc[0, :].to_numpy()
+        y_test = ann_trainer.train_label.iloc[0, :].to_numpy()
         for fstem, phist in ann_trainer.hyper_train(ann_all_hyper_params):
-            print(f"{fstem}: {json.dumps(phist['train_output'], indent=4)}")
-
-            sample_input_data = np.array(
-                [[80, 220, 0.1, 50, 1.24, 59, 4, 105, 0.183, 8.5e-05]]
-            )
-
-            print(inference(f"{fstem}.keras", sample_input_data))
+            json.dumps(phist["train_output"], indent=4)
+            y_pred = inference(f"{fstem}.keras", x_test.reshape(1, -1))
+            print(f"{fstem} prediction: {y_pred}, true: {y_test}")
