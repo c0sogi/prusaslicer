@@ -5,14 +5,13 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import (
     Any,
-    Callable,
     Dict,
     Iterator,
     List,
+    Literal,
+    Set,
     Tuple,
-    Type,
     Union,
-    get_args,
 )
 
 import numpy as np
@@ -21,19 +20,13 @@ from scipy.interpolate import interp1d
 from sklearn.model_selection import KFold
 
 from .config import BaseModelConfig
-from .schemas import (
-    ANNInputParams,
-    ANNOutputParams,
-    LSTMInputParams,
-    LSTMOutputParams,
-)
 from .typings import PickleHistory, SSCurve
 from .utils.logger import ApiLogger
 
 logger = ApiLogger(__name__)
 
 
-def normalize_1d_sequence(sequence: np.ndarray, trg_len: int) -> np.ndarray:
+def _normalize_1d_sequence(sequence: np.ndarray, trg_len: int) -> np.ndarray:
     assert len(sequence.shape) == 1, sequence.shape
     src_len = len(sequence)
     f = interp1d(
@@ -45,12 +38,12 @@ def normalize_1d_sequence(sequence: np.ndarray, trg_len: int) -> np.ndarray:
     return (seq_new - np.min(seq_new)) / (np.max(seq_new) - np.min(seq_new))
 
 
-def normalize_2d_sequence(matrix: np.ndarray, trg_len: int) -> np.ndarray:
+def _normalize_2d_sequence(matrix: np.ndarray, trg_len: int) -> np.ndarray:
     assert len(matrix.shape) == 2, matrix.shape
-    return np.array([normalize_1d_sequence(row, trg_len) for row in matrix])
+    return np.array([_normalize_1d_sequence(row, trg_len) for row in matrix])
 
 
-def read_single_ss_curve(
+def _read_single_ss_curve(
     csv_file_path: os.PathLike,
 ) -> pd.DataFrame:
     assert Path(csv_file_path).exists(), f"{csv_file_path} does not exist"
@@ -59,12 +52,10 @@ def read_single_ss_curve(
     # 두 번째 행을 기반으로 열 이름 설정
     df.columns = ["Name"] + df.iloc[0].tolist()[1:]
     df = df.drop([0, 1]).reset_index(drop=True)
-    df.set_index("Name", inplace=True)
-
     return df
 
 
-def read_ss_curves(
+def _read_ss_curves(
     raw_data_path: os.PathLike,
 ) -> pd.DataFrame:
     ss_data_dict: Dict[str, SSCurve] = {}
@@ -78,7 +69,7 @@ def read_ss_curves(
                 logger.error(f"{csv_file_path} is not valid: {e}")
                 continue
 
-            df = read_single_ss_curve(csv_file_path)
+            df = _read_single_ss_curve(csv_file_path)
             try:
                 strain = df["변형율"].tolist()
                 stress = df["강도"].tolist()
@@ -90,11 +81,12 @@ def read_ss_curves(
     for sample_name, curve in ss_data_dict.items():
         df = pd.DataFrame(curve)
         df["Name"] = sample_name
+        df.set_index("Name", inplace=True)
         frames.append(df)
-    return pd.concat(frames, ignore_index=True)
+    return pd.concat(frames)
 
 
-def read_x_and_y_from_table(
+def _read_x_and_y_from_table(
     csv_file_path: os.PathLike,
 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
     df = pd.read_csv(csv_file_path, header=None)
@@ -112,6 +104,38 @@ def read_x_and_y_from_table(
     y = df.iloc[:, y_indices]
     assert x.shape[0] == y.shape[0], f"{x.shape} != {y.shape}"
     return x, y
+
+
+def read_all(
+    raw_data_dir: os.PathLike = Path("./raw_data"),
+    table_filename: str = "table.csv",
+    drop_invalid: bool = True,
+) -> Dict[Literal["x_lstm", "x_ann", "y_ann"], pd.DataFrame]:
+    # Load raw data (ss curves and table)
+    x_lstm = _read_ss_curves(raw_data_dir)
+    x_ann, y_ann = _read_x_and_y_from_table(
+        Path(raw_data_dir) / table_filename
+    )
+
+    # Filter out invalid data from x_ann and y_ann
+    keys = set(x_ann.index) & set(y_ann.index) & set(x_lstm.index)
+    logger.debug(f"===== Number of valid data: {len(keys)} =====")
+    if drop_invalid:
+        x_ann = x_ann[x_ann.index.isin(keys)]
+        y_ann = y_ann[y_ann.index.isin(keys)]
+        x_lstm = x_lstm[x_lstm.index.isin(keys)]
+    _shape = x_lstm.shape
+
+    # Merge x_lstm, x_ann, and y_ann
+    for to_merge in (x_ann, y_ann):
+        x_lstm = x_lstm.merge(to_merge, on="Name", how="left")
+    x_lstm.dropna(inplace=True)
+    assert _shape[0] == x_lstm.shape[0], f"{_shape} != {x_lstm.shape}"
+    return {
+        "x_lstm": x_lstm,
+        "x_ann": x_ann,
+        "y_ann": y_ann,
+    }
 
 
 def dump_pickle(
@@ -146,59 +170,55 @@ def load_jsonl(file_path: os.PathLike) -> List[Dict[str, object]]:
 
 
 @dataclass
-class BaseDataLoader:
+class DataLoader:
     model_config: BaseModelConfig
 
+    input_dataset: pd.DataFrame
+    output_dataset: pd.DataFrame
+
+    train_input_params: Set[str]
+    train_output_params: Set[str]
+
+    train_inputs: pd.DataFrame = field(init=False, repr=False)
+    train_outputs: pd.DataFrame = field(init=False, repr=False)
+
     # To be filled
-    train_data: pd.DataFrame = field(init=False, repr=False)
-    input_params_type: Type = field(init=False, repr=False)
-    output_params_type: Type = field(init=False, repr=False)
-    train_label: pd.DataFrame = field(init=False, repr=False)
-    raw_data_reader: Callable[
-        [os.PathLike], Tuple[pd.DataFrame, pd.DataFrame]
-    ] = field(init=False, repr=False)
 
     def __post_init__(self):
-        # Input 및 Output DataFrame으로 분리
-        self.input_data, self.output_data = self.raw_data_reader(
-            Path(self.model_config.input_path)
-        )
         assert (
-            self.input_data.shape[0] == self.output_data.shape[0]
-        ), "데이터 개수 불일치"
+            self.input_dataset.shape[0] == self.output_dataset.shape[0]
+        ), f"{self.input_dataset.shape} != {self.output_dataset.shape}"
 
-        x_params = list(get_args(self.input_params_type))
-        x_columns: List[str] = self.input_data.columns.tolist()
-        y_params = list(get_args(self.output_params_type))
-        y_columns: List[str] = self.output_data.columns.tolist()
+        x_columns: List[str] = self.input_dataset.columns.tolist()
+        y_columns: List[str] = self.output_dataset.columns.tolist()
         assert isinstance(x_columns, list) and isinstance(y_columns, list)
-        assert set(x_params) == set(x_columns), f"{x_columns} != {x_params}"
-        assert set(y_params) == set(y_columns), f"{y_columns} != {y_params}"
+        assert self.train_input_params == set(
+            x_columns
+        ), f"{x_columns} != {self.train_input_params}"
+        assert self.train_output_params == set(
+            y_columns
+        ), f"{y_columns} != {self.train_output_params}"
 
-        self.train_data = pd.concat(
+        self.train_inputs = pd.concat(
             [self.get_input_data(column_name) for column_name in x_columns],
             axis=1,
         ).astype(float)
-        self.train_label = pd.concat(
+        self.train_outputs = pd.concat(
             [self.get_output_data(column_name) for column_name in y_columns],
             axis=1,
         ).astype(float)
 
+        logger.debug(f"===== Train inputs: {self.train_inputs.shape} =====")
+        logger.debug(self.train_inputs.head(48))
         logger.debug(
-            f"===== Input Data: {self.input_data.shape} =====\n{self.input_data.head(3)}"  # noqa: E501
+            f"===== Train outputs: {self.train_outputs.shape} ====="
         )
-        logger.debug(
-            f"===== Output Data: {self.output_data.shape} =====\n{self.output_data.head(3)}"  # noqa: E501
-        )
-        logger.debug(f"===== Train Data: {self.train_data.shape} =====")
-        logger.debug(self.train_data.head(48))
-        logger.debug(f"===== Train Label: {self.train_label.shape} =====")
-        logger.debug(self.train_label.head(3))
+        logger.debug(self.train_outputs.head(3))
 
     def dataset_batch_iterator(
         self, batch_size: int = 1
     ) -> Iterator[Tuple[pd.DataFrame, pd.DataFrame]]:
-        x_data, y_data = self.train_data, self.train_label
+        x_data, y_data = self.train_inputs, self.train_outputs
         dataset_size = min(len(x_data), len(y_data))
         for batch_start in range(0, dataset_size, batch_size):
             batch_end = min(dataset_size, batch_start + batch_size)
@@ -212,7 +232,7 @@ class BaseDataLoader:
         Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]
     ]:
         kf = KFold(n_splits=n_splits)
-        x_data, y_data = self.train_data, self.train_label
+        x_data, y_data = self.train_inputs, self.train_outputs
         for train_index, test_index in kf.split(x_data, y_data):
             x_train, x_test = (
                 x_data.iloc[train_index],
@@ -225,25 +245,7 @@ class BaseDataLoader:
             yield x_train, y_train, x_test, y_test
 
     def get_input_data(self, column_name: str) -> pd.Series:
-        return self.input_data[column_name]
+        return self.input_dataset[column_name]
 
     def get_output_data(self, column_name: str) -> pd.Series:
-        return self.output_data[column_name]
-
-
-@dataclass
-class DataLoaderANN(BaseDataLoader):
-    raw_data_reader: Callable[
-        [os.PathLike], Tuple[pd.DataFrame, pd.DataFrame]
-    ] = read_x_and_y_from_table
-    input_params_type: Type = ANNInputParams
-    output_params_type: Type = ANNOutputParams
-
-
-@dataclass
-class DataLoaderLSTM(BaseDataLoader):
-    raw_data_reader: Callable[
-        [os.PathLike], Tuple[pd.DataFrame, pd.DataFrame]
-    ] = read_ss_curves
-    input_params_type: Type = LSTMInputParams
-    output_params_type: Type = LSTMOutputParams
+        return self.output_dataset[column_name]

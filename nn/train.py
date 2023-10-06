@@ -17,7 +17,7 @@ from tensorflow import keras
 from .callbacks import AccuracyPerEpoch, EarlyStopping
 from .config import BaseModelConfig
 from .dataloader import (
-    BaseDataLoader,
+    DataLoader,
     PickleHistory,
     dump_pickle,
     load_pickle,
@@ -35,7 +35,7 @@ logger = ApiLogger(__name__)
 
 @dataclass
 class Trainer:
-    data_loader_class: Type[BaseDataLoader]
+    data_loader: DataLoader
     model_class: Type[keras.Model]
     model_config: BaseModelConfig
     model_name: Optional[str] = None
@@ -44,15 +44,14 @@ class Trainer:
 
     def __post_init__(self) -> None:
         self._model_name = self.model_name or str(self.model_class.__name__)
-        self._data_loader = self.data_loader_class(self.model_config)
 
     @property
-    def train_data(self) -> pd.DataFrame:
-        return self._data_loader.train_data
+    def train_inputs(self) -> pd.DataFrame:
+        return self.data_loader.train_inputs
 
     @property
-    def train_label(self) -> pd.DataFrame:
-        return self._data_loader.train_label
+    def train_outputs(self) -> pd.DataFrame:
+        return self.data_loader.train_outputs
 
     @property
     def kfold_splits(self) -> int:
@@ -72,7 +71,7 @@ class Trainer:
             # Kfolds
             zips = []  # type: List[Tuple[str, PickleHistory]]
             for kfold_case, (x_train, y_train, x_test, y_test) in enumerate(
-                self._data_loader.dataset_kfold_iterator(kfold_splits),
+                self.data_loader.dataset_kfold_iterator(kfold_splits),
                 start=1,
             ):
                 logger.info(f"Kfolds: {kfold_case}/{kfold_splits}")
@@ -88,8 +87,8 @@ class Trainer:
         else:
             # Normal
             return self._train(
-                x_train=self.train_data,
-                y_train=self.train_label,
+                x_train=self.train_inputs,
+                y_train=self.train_outputs,
                 hyper_params=hyper_params,
             )
 

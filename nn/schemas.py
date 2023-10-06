@@ -1,7 +1,7 @@
 from typing import Literal
 
 
-ANNInputParams = Literal[
+ANNInputParams = {
     "bedtemp",
     "exttemp",
     "layerthickness",
@@ -12,9 +12,9 @@ ANNInputParams = Literal[
     "glasstransitiontemp",
     "thermalconductivity",
     "linearthermalexpansioncoefficient",
-]
+}
 
-ANNOutputParams = Literal[
+ANNOutputParams = {
     # "weight",
     # "width1",
     # "width2",
@@ -23,7 +23,7 @@ ANNOutputParams = Literal[
     # "depth",
     "strength",
     "lengthavg",
-]
+}
 
 
 # _ANN_INPUT_PARAM_ARGS = get_args(ANNInputParams)
