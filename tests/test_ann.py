@@ -51,3 +51,13 @@ class TestANN(unittest.TestCase):
             json.dumps(phist["train_output"], indent=4)
             y_pred = inference(f"{fstem}.keras", x_test.reshape(1, -1))
             print(f"{fstem} prediction: {y_pred}, true: {y_test}")
+            strength_pred = y_pred[0][0]
+            strength_true = y_test[0]
+            self.assertAlmostEqual(
+                strength_pred, strength_true, delta=strength_true * 0.5
+            )
+            dimension_pred = y_pred[0][1]
+            dimension_true = y_test[1]
+            self.assertAlmostEqual(
+                dimension_pred, dimension_true, delta=dimension_true * 1.0
+            )
