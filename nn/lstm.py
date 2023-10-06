@@ -88,33 +88,41 @@ class LSTM(LSTMFrame):
 
     def call(self, data: tf.Tensor, training: bool = False):
         if training:
-            encoder_input, decoder_input = data
+            encoder_input, decoder_input = tf.split(
+                data, 2, axis=1
+            )  # Split the data into two halves along the sequence length dimension
             encoder_output, state_h, state_c = self.encoder_lstm(
                 self.encoder_dense(encoder_input)
-            )  # type: ignore
-            decoder_output, _, _ = self.decoder_lstm(
+            )
+            decoder_output = self.decoder_lstm(
                 decoder_input, initial_state=[state_h, state_c]
-            )  # type: ignore
+            )
+
             return self.decoder_dense(decoder_output)
         else:
             encoder_input = data
             encoder_output, state_h, state_c = self.encoder_lstm(
                 self.encoder_dense(encoder_input)
-            )  # type: ignore
+            )
             decoder_seq = tf.zeros(
                 (tf.shape(encoder_input)[0], 1, self.model_config.dim_out)
             )  # Assuming the output dimension is model_config.dim_out
 
-            all_outputs = []
+            all_outputs = tf.TensorArray(
+                dtype=tf.float32,
+                size=self.model_config.seq_len,
+                dynamic_size=False,
+                infer_shape=True,
+            )
 
-            for _ in range(self.model_config.seq_len):
-                decoder_output, state_h, state_c = self.decoder_lstm(
+            for t in tf.range(self.model_config.seq_len):
+                decoder_output = self.decoder_lstm(
                     decoder_seq, initial_state=[state_h, state_c]
-                )  # type: ignore
+                )
                 decoder_seq = self.decoder_dense(decoder_output)
-                all_outputs.append(decoder_seq)
+                all_outputs = all_outputs.write(t, decoder_seq)
 
-            return tf.concat(all_outputs, axis=1)
+            return tf.concat(all_outputs.stack(), axis=1)
 
 
 # import tensorflow as tf
