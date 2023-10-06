@@ -63,3 +63,13 @@ class TrainOutput(TypedDict):
 class PickleHistory(TypedDict):
     train_input: TrainInput
     train_output: TrainOutput
+
+
+class SSCurve(TypedDict):
+    strain: List[float]
+    stress: List[float]
+
+
+class SSData(TypedDict):
+    idx: int
+    curve: SSCurve

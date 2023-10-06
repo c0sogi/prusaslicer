@@ -5,17 +5,16 @@ from typing import Dict, Union
 import tensorflow as tf
 from keras import Model
 from keras.layers import LSTM as LSTMLayer
-from keras.layers import (
-    Dense,
-    RepeatVector,
-    TimeDistributed,
-)
+from keras.layers import Dense, RepeatVector, TimeDistributed
+from keras.optimizers import Adam
+from keras.regularizers import l1_l2, l1, l2
 from keras.src.engine import data_adapter
 
 from .config import LSTMModelConfig
+from .losses import weighted_loss
 
 
-class ModelFrame(Model):
+class LSTMFrame(Model):
     def train_step(
         self, data: tf.Tensor
     ) -> Dict[str, Union[float, tf.Tensor]]:
@@ -56,44 +55,66 @@ class ModelFrame(Model):
         )
 
 
-class LSTM(ModelFrame):
+class LSTM(LSTMFrame):
     def __init__(self, model_config: LSTMModelConfig, **kwargs):
         # Define model parameters
         self.model_config = model_config
         super().__init__(**kwargs)
 
+        # Define optimizer
+        self.optimizer = Adam(learning_rate=model_config.lr)
+
         # Encoder
-        self.encoder_dense = Dense(
-            model_config.encoder_lstm_units, activation="relu"
+        self.encoder_dense = tf.keras.layers.Dense(
+            model_config.lstm_units, activation=model_config.activation
         )
         self.encoder_lstm = LSTMLayer(
-            model_config.encoder_lstm_units, return_state=True
+            model_config.lstm_units, return_state=True
         )
 
         # Decoder
-        self.repeat_vector = RepeatVector(model_config.seq_len)
         self.decoder_lstm = LSTMLayer(
-            model_config.decoder_lstm_units, return_sequences=True
+            model_config.lstm_units, return_sequences=True
         )
         self.decoder_dense = TimeDistributed(Dense(model_config.dim_out))
-
-    def call(self, inputs: tf.Tensor) -> tf.Tensor:
-        # Encoder
-        x = tf.expand_dims(
-            self.encoder_dense(inputs), 1
-        )  # Add the time dimension
-        e_out = self.encoder_lstm(x)
-        assert e_out is not None, "Encoder LSTM returns None"
-        encoder_outputs, state_h, state_c = e_out
-        encoder_states = [state_h, state_c]
-
-        # Decoder
-        decoder_inputs = self.repeat_vector(encoder_outputs)
-        decoder_outputs = self.decoder_dense(
-            self.decoder_lstm(decoder_inputs, initial_state=encoder_states)
+        self.compile(
+            optimizer=self.optimizer,
+            loss=weighted_loss(
+                *model_config.loss_weights,
+                loss_funcs=model_config.loss_funcs,
+            ),
+            metrics=model_config.metrics,
         )
-        assert decoder_outputs is not None, "Decoder Dense returns None"
-        return decoder_outputs
+
+    def call(self, data: tf.Tensor, training: bool = False):
+        if training:
+            encoder_input, decoder_input = data
+            encoder_output, state_h, state_c = self.encoder_lstm(
+                self.encoder_dense(encoder_input)
+            )  # type: ignore
+            decoder_output, _, _ = self.decoder_lstm(
+                decoder_input, initial_state=[state_h, state_c]
+            )  # type: ignore
+            return self.decoder_dense(decoder_output)
+        else:
+            encoder_input = data
+            encoder_output, state_h, state_c = self.encoder_lstm(
+                self.encoder_dense(encoder_input)
+            )  # type: ignore
+            decoder_seq = tf.zeros(
+                (tf.shape(encoder_input)[0], 1, self.model_config.dim_out)
+            )  # Assuming the output dimension is model_config.dim_out
+
+            all_outputs = []
+
+            for _ in range(self.model_config.seq_len):
+                decoder_output, state_h, state_c = self.decoder_lstm(
+                    decoder_seq, initial_state=[state_h, state_c]
+                )  # type: ignore
+                decoder_seq = self.decoder_dense(decoder_output)
+                all_outputs.append(decoder_seq)
+
+            return tf.concat(all_outputs, axis=1)
 
 
 # import tensorflow as tf

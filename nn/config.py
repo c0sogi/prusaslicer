@@ -92,8 +92,7 @@ class ANNModelConfig(BaseModelConfig):
 class LSTMModelConfig(BaseModelConfig):
     material_properties_dim: int = -1
     seq_len: int = -1
-    encoder_lstm_units: int = -1
-    decoder_lstm_units: int = -1
+    lstm_units: int = -1
 
     # # 아래는 자동으로 계산됨
     # number_of_experiments: int = field(init=False, repr=False)
