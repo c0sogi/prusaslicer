@@ -8,7 +8,9 @@ from tensorflow import keras
 from .ann import ANN
 
 
-def inference(model_path: Union[str, Path]) -> np.ndarray:
+def inference(
+    model_path: Union[str, Path], input_data: np.ndarray
+) -> np.ndarray:
     # 모델 초기화
     model = keras.models.load_model(model_path)
     if model is None:
@@ -24,7 +26,7 @@ def inference(model_path: Union[str, Path]) -> np.ndarray:
     )
 
     # Inference 수행
-    predictions = model.predict(sample_input_data)
+    predictions = model.predict(input_data)
     print(
         f"{type(model)} Predictions for {Path(model_path).name}:",
         predictions,
@@ -41,4 +43,4 @@ if __name__ == "__main__":
     )
 
     for model_path in Path("output").glob("*.keras"):
-        inference(model_path)
+        inference(model_path, sample_input_data)

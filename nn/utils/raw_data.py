@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple, TypedDict
 
 import pandas as pd
 
-from nn.utils.logger import ApiLogger
+from ..utils.logger import ApiLogger
 
 logger = ApiLogger(__name__)
 

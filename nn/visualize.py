@@ -1,11 +1,12 @@
 # flake8: noqa: E402
+import os
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 from matplotlib import pyplot as plt
 
-from .dataloader import PathLike, load_pickle_list, load_pickle
+from .dataloader import load_pickle_list, load_pickle
 from .train import PickleHistory
 
 
@@ -147,7 +148,7 @@ def select_top_cases(
 
 # Function to plot graphs
 def plot_graphs(
-    pickle_path: PathLike,
+    pickle_path: os.PathLike,
     ymin: Optional[float] = None,
     ymax: Optional[float] = None,
 ):
@@ -171,7 +172,9 @@ def plot_graphs(
                     f"{k}={v}" for k, v in hyper_params.items()
                 )
                 plt.bar(
-                    hyper_params_str, last_metric_value, label=hyper_params_str
+                    hyper_params_str,
+                    last_metric_value,
+                    label=hyper_params_str,
                 )
 
         # Save the figure
@@ -210,8 +213,8 @@ def plot_metrics(history, metrics):
 
 
 def plot_val_loss(
-    pkl_dir: PathLike,
-    save_dir: PathLike,
+    pkl_dir: os.PathLike,
+    save_dir: os.PathLike,
     ymin: Optional[float] = None,
     ymax: Optional[float] = None,
     xmin: Optional[int] = None,
@@ -301,8 +304,8 @@ if __name__ == "__main__":
     # plot_metrics(history, ["loss", "mae", "mape", "rmse"])
 
     plot_val_loss(
-        "output_ann_re",
-        "image_ann_re",
+        Path("output_ann_re"),
+        Path("image_ann_re"),
         ymin=0.0,
         ymax=0.8,
         xmin=0,

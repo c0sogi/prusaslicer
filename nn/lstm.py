@@ -7,17 +7,12 @@ from keras import Model
 from keras.layers import LSTM as LSTMLayer
 from keras.layers import (
     Dense,
-    Dropout,
-    LayerNormalization,
     RepeatVector,
     TimeDistributed,
 )
-from keras.optimizers import Adam
-from keras.regularizers import l1_l2
 from keras.src.engine import data_adapter
 
 from .config import LSTMModelConfig
-from .losses import weighted_loss
 
 
 class ModelFrame(Model):
@@ -76,7 +71,7 @@ class LSTM(ModelFrame):
         )
 
         # Decoder
-        self.repeat_vector = RepeatVector(model_config.max_sequence_length)
+        self.repeat_vector = RepeatVector(model_config.seq_len)
         self.decoder_lstm = LSTMLayer(
             model_config.decoder_lstm_units, return_sequences=True
         )
@@ -113,7 +108,7 @@ class LSTM(ModelFrame):
 # from keras.optimizers import Adam
 # from tensorflow.python.keras.engine import data_adapter
 
-# from nn.config import LSTMModelConfig
+# from .config import LSTMModelConfig
 
 
 # class LSTMModel(ModelFrame):

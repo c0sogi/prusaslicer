@@ -1,7 +1,8 @@
+import os
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-import subprocess
-from typing import List, Optional, Union
+from typing import List, Optional
 
 from config import STL_FILENAME
 
@@ -15,14 +16,14 @@ PRUSA_CLI_EXECUTABLE = (
 
 @dataclass
 class SliceOptions:
-    stl: Union[str, Path]
-    config: Union[str, Path]
-    output: Union[str, Path]
+    stl: os.PathLike
+    config: os.PathLike
+    output: os.PathLike
 
     def __post_init__(self):
-        self.stl = Path(self.stl).resolve().as_posix()
-        self.config = Path(self.config).resolve().as_posix()
-        self.output = Path(self.output).resolve().as_posix()
+        self.stl = Path(self.stl).resolve()
+        self.config = Path(self.config).resolve()
+        self.output = Path(self.output).resolve()
         for file in (self.stl, self.config):
             if not Path(file).exists():
                 raise ValueError(f"File {file} does not exist")
@@ -48,7 +49,7 @@ def clean_folder(
             file_path.unlink()
 
 
-def find_duplicate_keys(file_path: Union[str, Path]) -> List[str]:
+def find_duplicate_keys(file_path: os.PathLike) -> List[str]:
     keys = {}
     duplicate_keys = []
 
@@ -100,4 +101,6 @@ if __name__ == "__main__":
             output=Path(output_folder_name)
             / (f"{file_no}_" + config_file.name.replace(".ini", ".gcode")),
         )
-        subprocess.run(options.cli_args, check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(
+            options.cli_args, check=True, stdout=subprocess.DEVNULL
+        )

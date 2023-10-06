@@ -1,13 +1,4 @@
-from typing import Dict, Iterable, List, Literal, TypedDict, Union
-
-from typing_extensions import NotRequired
-
-from .config import BaseModelConfig
-
-
-HyperParamValue = Union[int, float]
-HyperParamsDict = Dict[str, HyperParamValue]
-HyperParamsDictAll = Dict[str, Iterable[HyperParamValue]]
+from typing import Literal
 
 
 ANNInputParams = Literal[
@@ -51,24 +42,3 @@ ANNOutputParams = Literal[
 
 LSTMInputParams = Literal["변형율"]
 LSTMOutputParams = Literal["강도"]
-
-
-class TrainInput(TypedDict):
-    hyper_params: HyperParamsDict
-    config: BaseModelConfig
-
-
-class TrainOutput(TypedDict):
-    loss: NotRequired[List[float]]
-    mae: NotRequired[List[float]]
-    mape: NotRequired[List[float]]
-    val_loss: NotRequired[List[float]]
-    val_mse: NotRequired[List[float]]
-    val_mae: NotRequired[List[float]]
-    val_mape: NotRequired[List[float]]
-    rmse: NotRequired[List[float]]
-
-
-class PickleHistory(TypedDict):
-    train_input: TrainInput
-    train_output: TrainOutput

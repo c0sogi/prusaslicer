@@ -1,6 +1,7 @@
 # flake8: noqa
 from dataclasses import dataclass, field
 import logging
+import os
 from pathlib import Path
 from typing import Iterable, Optional, Tuple, Union
 from typing_extensions import TypedDict
@@ -20,7 +21,6 @@ from .config import N_OUTPUT_PARAMS as M
 from .network import NeuralNet
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-PathLike = Union[str, Path]
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
@@ -39,7 +39,7 @@ class Trainer:
     optimizer: optim.Optimizer
     criterion: _Loss
     batch_size: int
-    model_path: PathLike = "./checkpoint/model.pt"
+    model_path: os.PathLike = Path("./checkpoint/model.pt")
     checkpoint_prefix: str = "best"
     _best_loss_val: float = field(init=False, default=np.inf)
     _epochs: int = field(init=False, default=0)
@@ -122,7 +122,7 @@ class Trainer:
         )
         logger.info(f"Saved checkpoint at {self.checkpoint_path}")
 
-    def load_checkpoint(self, path: PathLike) -> None:
+    def load_checkpoint(self, path: os.PathLike) -> None:
         """Load the model checkpoint."""
         checkpoint = torch.load(path)  # type: CheckPoint
         self._epochs = checkpoint["epoch"]

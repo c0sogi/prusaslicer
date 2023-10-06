@@ -4,25 +4,9 @@ from typing import Callable, Dict, List, Literal, Union
 import tensorflow as tf
 from keras import losses
 
-LOSS_KEYS = Literal[
-    "mae",
-    "mse",
-    "mape",
-    "msle",
-    "huber",
-    "logcosh",
-    "poisson",
-    "cosine",
-    "kld",
-    "binary_crossentropy",
-    "categorical_crossentropy",
-    "sparse_categorical_crossentropy",
-    "hinge",
-    "squared_hinge",
-    "categorical_hinge",
-    "kl_divergence",
-]
-LOSS_FUNC_DICT: Dict[LOSS_KEYS, Callable] = {
+from .typings import LossFuncs, LossKeys, LossLike
+
+LOSS_FUNC_DICT: Dict[LossKeys, Callable] = {
     "mae": losses.MeanAbsoluteError(),
     "mse": losses.MeanSquaredError(),
     "mape": losses.MeanAbsolutePercentageError(),
@@ -42,9 +26,6 @@ LOSS_FUNC_DICT: Dict[LOSS_KEYS, Callable] = {
 }
 
 
-LossLike = Union[Callable[[tf.Tensor, tf.Tensor], tf.Tensor], LOSS_KEYS]
-
-
 def convert_to_loss_func(
     loss_func: LossLike,
 ) -> Callable[[tf.Tensor, tf.Tensor], tf.Tensor]:
@@ -57,11 +38,12 @@ def convert_to_loss_func(
 
 def weighted_loss(
     *loss_weights: float,
-    loss_funcs: Union[LossLike, LOSS_KEYS, List[LossLike], List[LOSS_KEYS]],
+    loss_funcs: LossFuncs,
 ) -> Callable[[tf.Tensor, tf.Tensor], tf.Tensor]:
     if isinstance(loss_funcs, (str, Callable)):
         lfs = [
-            convert_to_loss_func(loss_funcs) for _ in range(len(loss_weights))
+            convert_to_loss_func(loss_funcs)
+            for _ in range(len(loss_weights))
         ]
     else:  # It's a list
         lfs = [convert_to_loss_func(lf) for lf in loss_funcs]

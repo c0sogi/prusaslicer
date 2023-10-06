@@ -17,9 +17,10 @@ from typing import (
 
 import pandas as pd
 from sklearn.model_selection import KFold
+from .typings import PickleHistory
 
-from nn.utils.logger import ApiLogger
-from nn.utils.raw_data import read_overall_table
+from .utils.logger import ApiLogger
+from .utils.raw_data import read_overall_table
 
 from .config import BaseModelConfig
 from .schemas import (
@@ -27,42 +28,9 @@ from .schemas import (
     ANNOutputParams,
     LSTMInputParams,
     LSTMOutputParams,
-    PickleHistory,
 )
 
-PathLike = Union[str, Path]
 logger = ApiLogger(__name__)
-
-
-def dump_pickle(
-    file_path: PathLike, data: Union[PickleHistory, List[PickleHistory]]
-) -> None:
-    with open(file_path, "wb") as f:
-        pickle.dump(data, f)
-
-
-def load_pickle(file_path: PathLike) -> PickleHistory:
-    with open(file_path, "rb") as f:
-        return pickle.load(f)
-
-
-def load_pickle_list(
-    file_path: PathLike,
-) -> List[PickleHistory]:
-    with open(file_path, "rb") as f:
-        return list(pickle.load(f))
-
-
-def dump_jsonl(file_path: PathLike, data: List[Any]) -> None:
-    Path(file_path).write_text(
-        "\n".join(json.dumps(entry) for entry in data)
-    )
-
-
-def load_jsonl(file_path: PathLike) -> List[Dict[str, object]]:
-    return [
-        json.loads(line) for line in Path(file_path).read_text().splitlines()
-    ]
 
 
 @dataclass
@@ -100,7 +68,7 @@ class BaseDataLoader:
             axis=1,
         ).astype(float)
         self.train_label = pd.concat(
-            [self.get_input_data(column_name) for column_name in y_columns],
+            [self.get_output_data(column_name) for column_name in y_columns],
             axis=1,
         ).astype(float)
 
@@ -167,3 +135,34 @@ class DataLoaderLSTM(BaseDataLoader):
     ] = read_overall_table
     input_params_type: Type = LSTMInputParams
     output_params_type: Type = LSTMOutputParams
+
+
+def dump_pickle(
+    file_path: os.PathLike, data: Union[PickleHistory, List[PickleHistory]]
+) -> None:
+    with open(file_path, "wb") as f:
+        pickle.dump(data, f)
+
+
+def load_pickle(file_path: os.PathLike) -> PickleHistory:
+    with open(file_path, "rb") as f:
+        return pickle.load(f)
+
+
+def load_pickle_list(
+    file_path: os.PathLike,
+) -> List[PickleHistory]:
+    with open(file_path, "rb") as f:
+        return list(pickle.load(f))
+
+
+def dump_jsonl(file_path: os.PathLike, data: List[Any]) -> None:
+    Path(file_path).write_text(
+        "\n".join(json.dumps(entry) for entry in data)
+    )
+
+
+def load_jsonl(file_path: os.PathLike) -> List[Dict[str, object]]:
+    return [
+        json.loads(line) for line in Path(file_path).read_text().splitlines()
+    ]

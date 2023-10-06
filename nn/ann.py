@@ -10,7 +10,7 @@ from keras.regularizers import l1_l2
 from keras.src.engine import data_adapter
 
 from .config import BaseModelConfig, ANNModelConfig
-from .losses import LOSS_FUNC_DICT, weighted_loss
+from .losses import weighted_loss
 
 
 class ModelFrame(Model):

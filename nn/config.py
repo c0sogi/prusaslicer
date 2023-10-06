@@ -1,8 +1,9 @@
-from keras.src import activations
 from dataclasses import dataclass, field, fields
-from typing import Dict, List, Optional, Union, get_args
+from typing import Dict, List, Optional, get_args
 
-from .losses import LOSS_KEYS
+from keras.src import activations
+
+from .typings import LossFuncsString, LossKeys
 from .utils.logger import ApiLogger
 
 logger = ApiLogger(__name__)
@@ -26,7 +27,7 @@ class BaseModelConfig:
 
     # 하이퍼파라미터
     lr: float = 0.001
-    loss_funcs: Union[LOSS_KEYS, List[LOSS_KEYS]] = field(
+    loss_funcs: LossFuncsString = field(
         default_factory=lambda: ["mae", "mae"]
     )
     loss_weights: List[float] = field(default_factory=lambda: [0.5, 0.5])
@@ -53,11 +54,11 @@ class BaseModelConfig:
         assert self.patience > 0, "Patience는 0보다 커야 합니다."
         if isinstance(self.loss_funcs, str):
             assert self.loss_funcs in get_args(
-                LOSS_KEYS
+                LossKeys
             ), "잘못된 Loss Function입니다."
         else:
             assert all(
-                lf in get_args(LOSS_KEYS) for lf in self.loss_funcs
+                lf in get_args(LossKeys) for lf in self.loss_funcs
             ), "잘못된 Loss Function입니다."
         assert all(
             0.0 <= w <= 1.0 for w in self.loss_weights
@@ -90,7 +91,7 @@ class ANNModelConfig(BaseModelConfig):
 @dataclass
 class LSTMModelConfig(BaseModelConfig):
     material_properties_dim: int = -1
-    max_sequence_length: int = -1
+    seq_len: int = -1
     encoder_lstm_units: int = -1
     decoder_lstm_units: int = -1
 

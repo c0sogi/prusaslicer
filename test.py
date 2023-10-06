@@ -1,12 +1,14 @@
+from pathlib import Path
 from typing import List
-from nn.dataloader import load_pickle_list
-from nn.schemas import PickleHistory
+from nn.dataloader import load_pickle_list, PickleHistory
 
 
 # 파라미터별로 평균 loss를 계산하는 함수
 def mean_loss_by_param(pkl: List[PickleHistory], param: str):
     # 파라미터의 가능한 값들을 추출
-    values = sorted(set(i["train_input"]["hyper_params"][param] for i in pkl))
+    values = sorted(
+        set(i["train_input"]["hyper_params"][param] for i in pkl)
+    )
     # 파라미터별로 loss의 평균을 저장할 딕셔너리
     mean_loss = {}
     # 각 값에 대해 반복
@@ -27,7 +29,7 @@ def mean_loss_by_param(pkl: List[PickleHistory], param: str):
 
 
 path = "output/ANN_2023_08_30_102253.pkl"
-pkl = load_pickle_list(path)
+pkl = load_pickle_list(Path(path))
 
 # 각 파라미터에 대해 평균 loss를 계산하고 출력
 for param in ["lr", "n1", "n2", "n3"]:
