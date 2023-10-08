@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from nn.ann import ANN
 from nn.config import ANNModelConfig, LSTMModelConfig
-from nn.dataloader import DataLoader, read_all
+from nn.dataloader import DataLoader
 from nn.inference import inference
 from nn.lstm import LSTM
 from nn.schemas import (
@@ -15,6 +15,7 @@ from nn.schemas import (
     ANNOutputParams,
     LSTMInputParams,
     LSTMOutputParams,
+    read_all,
 )
 from nn.train import Trainer
 from nn.utils.logger import ApiLogger
