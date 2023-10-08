@@ -1,15 +1,16 @@
 import json
 import os
 import pickle
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     Any,
+    Callable,
     Dict,
+    Iterable,
     Iterator,
     List,
-    Literal,
-    Set,
+    Optional,
     Tuple,
     Union,
 )
@@ -20,7 +21,7 @@ from scipy.interpolate import interp1d
 from sklearn.model_selection import KFold
 
 from .config import BaseModelConfig
-from .typings import PickleHistory, SSCurve
+from .typings import DataLike, PickleHistory, SSCurve
 from .utils.logger import ApiLogger
 
 logger = ApiLogger(__name__)
@@ -109,33 +110,20 @@ def _read_x_and_y_from_table(
 def read_all(
     raw_data_dir: os.PathLike = Path("./raw_data"),
     table_filename: str = "table.csv",
-    drop_invalid: bool = True,
-) -> Dict[Literal["x_lstm", "x_ann", "y_ann"], pd.DataFrame]:
+    dropna: bool = True,
+) -> pd.DataFrame:
     # Load raw data (ss curves and table)
-    x_lstm = _read_ss_curves(raw_data_dir)
-    x_ann, y_ann = _read_x_and_y_from_table(
+    ss_curves = _read_ss_curves(raw_data_dir)
+    print(ss_curves)
+    x_data, y_data = _read_x_and_y_from_table(
         Path(raw_data_dir) / table_filename
     )
-
-    # Filter out invalid data from x_ann and y_ann
-    keys = set(x_ann.index) & set(y_ann.index) & set(x_lstm.index)
-    logger.debug(f"===== Number of valid data: {len(keys)} =====")
-    if drop_invalid:
-        x_ann = x_ann[x_ann.index.isin(keys)]
-        y_ann = y_ann[y_ann.index.isin(keys)]
-        x_lstm = x_lstm[x_lstm.index.isin(keys)]
-    _shape = x_lstm.shape
-
-    # Merge x_lstm, x_ann, and y_ann
-    for to_merge in (x_ann, y_ann):
-        x_lstm = x_lstm.merge(to_merge, on="Name", how="left")
-    x_lstm.dropna(inplace=True)
-    assert _shape[0] == x_lstm.shape[0], f"{_shape} != {x_lstm.shape}"
-    return {
-        "x_lstm": x_lstm,
-        "x_ann": x_ann,
-        "y_ann": y_ann,
-    }
+    for to_merge in (x_data, y_data):
+        ss_curves = ss_curves.merge(to_merge, on="Name", how="left")
+    if dropna:
+        ss_curves.dropna(inplace=True)
+    logger.debug(f"===== Number of valid data: {ss_curves.shape[0]} =====")
+    return ss_curves
 
 
 def dump_pickle(
@@ -173,40 +161,35 @@ def load_jsonl(file_path: os.PathLike) -> List[Dict[str, object]]:
 class DataLoader:
     model_config: BaseModelConfig
 
-    input_dataset: pd.DataFrame
-    output_dataset: pd.DataFrame
+    train_inputs: pd.DataFrame
+    train_outputs: pd.DataFrame
 
-    train_input_params: Set[str]
-    train_output_params: Set[str]
+    train_input_params: Iterable[str]
+    train_output_params: Iterable[str]
 
-    train_inputs: pd.DataFrame = field(init=False, repr=False)
-    train_outputs: pd.DataFrame = field(init=False, repr=False)
+    train_inputs_processor: Optional[
+        Callable[[pd.DataFrame], DataLike]
+    ] = None
+    train_outputs_processor: Optional[
+        Callable[[pd.DataFrame], DataLike]
+    ] = None
 
     # To be filled
 
     def __post_init__(self):
         assert (
-            self.input_dataset.shape[0] == self.output_dataset.shape[0]
-        ), f"{self.input_dataset.shape} != {self.output_dataset.shape}"
+            self.train_inputs.shape[0] == self.train_outputs.shape[0]
+        ), f"{self.train_inputs.shape} != {self.train_outputs.shape}"
 
-        x_columns: List[str] = self.input_dataset.columns.tolist()
-        y_columns: List[str] = self.output_dataset.columns.tolist()
+        x_columns: List[str] = self.train_inputs.columns.tolist()
+        y_columns: List[str] = self.train_outputs.columns.tolist()
         assert isinstance(x_columns, list) and isinstance(y_columns, list)
-        assert self.train_input_params == set(
+        assert set(self.train_input_params) == set(
             x_columns
         ), f"{x_columns} != {self.train_input_params}"
-        assert self.train_output_params == set(
+        assert set(self.train_output_params) == set(
             y_columns
         ), f"{y_columns} != {self.train_output_params}"
-
-        self.train_inputs = pd.concat(
-            [self.get_input_data(column_name) for column_name in x_columns],
-            axis=1,
-        ).astype(float)
-        self.train_outputs = pd.concat(
-            [self.get_output_data(column_name) for column_name in y_columns],
-            axis=1,
-        ).astype(float)
 
         logger.debug(f"===== Train inputs: {self.train_inputs.shape} =====")
         logger.debug(self.train_inputs.head(48))
@@ -217,35 +200,47 @@ class DataLoader:
 
     def dataset_batch_iterator(
         self, batch_size: int = 1
-    ) -> Iterator[Tuple[pd.DataFrame, pd.DataFrame]]:
+    ) -> Iterator[Tuple[DataLike, DataLike]]:
         x_data, y_data = self.train_inputs, self.train_outputs
         dataset_size = min(len(x_data), len(y_data))
         for batch_start in range(0, dataset_size, batch_size):
             batch_end = min(dataset_size, batch_start + batch_size)
-            yield x_data[batch_start:batch_end], y_data[
-                batch_start:batch_end
-            ]
+            yield self._preprocess_dataset(
+                x_data[batch_start:batch_end], y_data[batch_start:batch_end]
+            )
 
     def dataset_kfold_iterator(
         self, n_splits: int = 5
-    ) -> Iterator[
-        Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]
-    ]:
+    ) -> Iterator[Tuple[DataLike, DataLike, DataLike, DataLike]]:
         kf = KFold(n_splits=n_splits)
-        x_data, y_data = self.train_inputs, self.train_outputs
-        for train_index, test_index in kf.split(x_data, y_data):
-            x_train, x_test = (
-                x_data.iloc[train_index],
-                x_data.iloc[test_index],
+        for train_index, test_index in kf.split(
+            self.train_inputs, self.train_outputs
+        ):
+            x_train, y_train = self._preprocess_dataset(
+                self.train_inputs.iloc[train_index],
+                self.train_outputs.iloc[train_index],
             )
-            y_train, y_test = (
-                y_data.iloc[train_index],
-                y_data.iloc[test_index],
+            x_test, y_test = self._preprocess_dataset(
+                self.train_inputs.iloc[test_index],
+                self.train_outputs.iloc[test_index],
             )
             yield x_train, y_train, x_test, y_test
 
     def get_input_data(self, column_name: str) -> pd.Series:
-        return self.input_dataset[column_name]
+        return self.train_inputs[column_name]
 
     def get_output_data(self, column_name: str) -> pd.Series:
-        return self.output_dataset[column_name]
+        return self.train_outputs[column_name]
+
+    def _preprocess_dataset(
+        self, x_data: pd.DataFrame, y_data: pd.DataFrame
+    ) -> Tuple[DataLike, DataLike]:
+        return (
+            self.train_inputs_processor(x_data)
+            if self.train_inputs_processor is not None
+            else x_data
+        ), (
+            self.train_outputs_processor(x_data)
+            if self.train_outputs_processor is not None
+            else y_data
+        )

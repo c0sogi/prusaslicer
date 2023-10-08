@@ -9,11 +9,14 @@ from typing import (
     TypedDict,
     Union,
 )
+import pandas as pd
 
 import tensorflow as tf
 
 if TYPE_CHECKING:
     from .config import BaseModelConfig
+
+DataLike = Union[pd.DataFrame, List[pd.DataFrame]]
 
 HyperParamValue = Union[int, float]
 HyperParamsDict = Dict[str, HyperParamValue]

@@ -23,6 +23,7 @@ from .dataloader import (
     load_pickle,
 )
 from .typings import (
+    DataLike,
     HyperParamsDict,
     HyperParamsDictAll,
     TrainInput,
@@ -94,9 +95,9 @@ class Trainer:
 
     def _train(
         self,
-        x_train: pd.DataFrame,
-        y_train: pd.DataFrame,
-        validation_data: Optional[Tuple[pd.DataFrame, pd.DataFrame]] = None,
+        x_train: DataLike,
+        y_train: DataLike,
+        validation_data: Optional[Tuple[DataLike, DataLike]] = None,
         hyper_params: Optional[HyperParamsDict] = None,
         kfold_case: Optional[int] = None,
         val_split: Optional[float] = 0.1,

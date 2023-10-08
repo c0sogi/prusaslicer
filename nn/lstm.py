@@ -5,9 +5,8 @@ from typing import Dict, Union
 import tensorflow as tf
 from keras import Model
 from keras.layers import LSTM as LSTMLayer
-from keras.layers import Dense, RepeatVector, TimeDistributed
+from keras.layers import Dense, TimeDistributed
 from keras.optimizers import Adam
-from keras.regularizers import l1_l2, l1, l2
 from keras.src.engine import data_adapter
 
 from .config import LSTMModelConfig
@@ -86,11 +85,12 @@ class LSTM(LSTMFrame):
             metrics=model_config.metrics,
         )
 
-    def call(self, data: tf.Tensor, training: bool = False):
+    def call(self, inputs: tf.Tensor, training: bool = False):
         if training:
-            encoder_input, decoder_input = tf.split(
-                data, 2, axis=1
-            )  # Split the data into two halves along the sequence length dimension
+            (
+                encoder_input,
+                decoder_input,
+            ) = inputs  # Directly unpack the two inputs
             encoder_output, state_h, state_c = self.encoder_lstm(
                 self.encoder_dense(encoder_input)
             )
@@ -100,7 +100,7 @@ class LSTM(LSTMFrame):
 
             return self.decoder_dense(decoder_output)
         else:
-            encoder_input = data
+            encoder_input = inputs
             encoder_output, state_h, state_c = self.encoder_lstm(
                 self.encoder_dense(encoder_input)
             )

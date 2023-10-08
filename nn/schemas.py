@@ -1,7 +1,4 @@
-from typing import Literal
-
-
-ANNInputParams = {
+ANNInputParams = [
     "bedtemp",
     "exttemp",
     "layerthickness",
@@ -12,9 +9,9 @@ ANNInputParams = {
     "glasstransitiontemp",
     "thermalconductivity",
     "linearthermalexpansioncoefficient",
-}
+]
 
-ANNOutputParams = {
+ANNOutputParams = [
     # "weight",
     # "width1",
     # "width2",
@@ -23,7 +20,7 @@ ANNOutputParams = {
     # "depth",
     "strength",
     "lengthavg",
-}
+]
 
 
 # _ANN_INPUT_PARAM_ARGS = get_args(ANNInputParams)
@@ -40,5 +37,5 @@ ANNOutputParams = {
 #     _ANN_INPUT_PARAM_ARGS.index("linearthermalexpansioncoefficient"),
 # )
 
-LSTMInputParams = Literal["변형율"]
-LSTMOutputParams = Literal["강도"]
+LSTMInputParams = ["strain"]
+LSTMOutputParams = ["stress"]

@@ -14,7 +14,6 @@ class BaseModelConfig:
     # 기본 설정
     seed: int = 777
     print_per_epoch: int = 100
-    input_path: str = "./raw_data.csv"
     output_path: str = "./output"
     metrics: List[str] = field(
         default_factory=lambda: ["mse", "mae", "mape"]
