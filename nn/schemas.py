@@ -50,11 +50,11 @@ ANNOutputParams = [
 #     _ANN_INPUT_PARAM_ARGS.index("linearthermalexpansioncoefficient"),
 # )
 
-LSTMInputParams = ["strain"]
+LSTMInputParams = ["stress"] + ANNInputParams
 LSTMOutputParams = ["stress"]
 
 
-def _normalize_1d_sequence(sequence: np.ndarray, trg_len: int) -> np.ndarray:
+def normalize_1d_sequence(sequence: np.ndarray, trg_len: int) -> np.ndarray:
     assert len(sequence.shape) == 1, sequence.shape
     src_len = len(sequence)
     f = interp1d(
@@ -64,11 +64,6 @@ def _normalize_1d_sequence(sequence: np.ndarray, trg_len: int) -> np.ndarray:
     )
     seq_new = f(np.linspace(0, src_len - 1, trg_len))
     return (seq_new - np.min(seq_new)) / (np.max(seq_new) - np.min(seq_new))
-
-
-def _normalize_2d_sequence(matrix: np.ndarray, trg_len: int) -> np.ndarray:
-    assert len(matrix.shape) == 2, matrix.shape
-    return np.array([_normalize_1d_sequence(row, trg_len) for row in matrix])
 
 
 def _read_single_ss_curve(
@@ -134,6 +129,17 @@ def _read_x_and_y_from_table(
     return x, y
 
 
+def group_ss_curves(df: pd.DataFrame) -> pd.DataFrame:
+    return pd.concat(
+        [
+            df.groupby(df.index)["strain"].apply(np.array),
+            df.groupby(df.index)["stress"].apply(np.array),
+            df.drop(columns=["strain", "stress"]).groupby(df.index).first(),
+        ],
+        axis=1,
+    )
+
+
 def read_all(
     raw_data_dir: os.PathLike = Path("./raw_data"),
     table_filename: str = "table.csv",
@@ -141,7 +147,6 @@ def read_all(
 ) -> pd.DataFrame:
     # Load raw data (ss curves and table)
     ss_curves = _read_ss_curves(raw_data_dir)
-    print(ss_curves)
     x_data, y_data = _read_x_and_y_from_table(
         Path(raw_data_dir) / table_filename
     )
@@ -149,5 +154,6 @@ def read_all(
         ss_curves = ss_curves.merge(to_merge, on="Name", how="left")
     if dropna:
         ss_curves.dropna(inplace=True)
+
     logger.debug(f"===== Number of valid data: {ss_curves.shape[0]} =====")
-    return ss_curves
+    return group_ss_curves(ss_curves)

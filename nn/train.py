@@ -9,7 +9,6 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
-import pandas as pd
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from tensorflow import keras
@@ -26,6 +25,7 @@ from .typings import (
     DataLike,
     HyperParamsDict,
     HyperParamsDictAll,
+    SingleData,
     TrainInput,
     TrainOutput,
 )
@@ -47,11 +47,11 @@ class Trainer:
         self._model_name = self.model_name or str(self.model_class.__name__)
 
     @property
-    def train_inputs(self) -> pd.DataFrame:
+    def train_inputs(self) -> DataLike:
         return self.data_loader.train_inputs
 
     @property
-    def train_outputs(self) -> pd.DataFrame:
+    def train_outputs(self) -> SingleData:
         return self.data_loader.train_outputs
 
     @property
@@ -96,7 +96,7 @@ class Trainer:
     def _train(
         self,
         x_train: DataLike,
-        y_train: DataLike,
+        y_train: SingleData,
         validation_data: Optional[Tuple[DataLike, DataLike]] = None,
         hyper_params: Optional[HyperParamsDict] = None,
         kfold_case: Optional[int] = None,
@@ -121,9 +121,25 @@ class Trainer:
 
         logger.info(f"Start training: {model_config}")
         if validation_data is None:
-            x_train, x_val, y_train, y_val = train_test_split(
-                x_train, y_train, test_size=val_split
-            )
+            if isinstance(x_train, (list, tuple)):
+                random_state_val = np.random.randint(0, int(1e5))
+                splits = [
+                    train_test_split(
+                        x, test_size=val_split, random_state=random_state_val
+                    )
+                    for x in x_train
+                ]
+                x_train = [s[0] for s in splits]
+                x_val = [s[1] for s in splits]
+                y_train, y_val = train_test_split(
+                    y_train,
+                    test_size=val_split,
+                    random_state=random_state_val,
+                )
+            else:
+                x_train, x_val, y_train, y_val = train_test_split(
+                    x_train, y_train, test_size=val_split
+                )
             validation_data = (x_val, y_val)
         hist = model.fit(
             x_train,

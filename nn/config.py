@@ -89,7 +89,6 @@ class ANNModelConfig(BaseModelConfig):
 
 @dataclass
 class LSTMModelConfig(BaseModelConfig):
-    material_properties_dim: int = -1
     seq_len: int = -1
     lstm_units: int = -1
 

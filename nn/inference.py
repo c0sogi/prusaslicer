@@ -5,11 +5,13 @@ from typing import Union
 import numpy as np
 from tensorflow import keras
 
+from nn.typings import DataLike
+
 from .ann import ANN
 
 
 def inference(
-    model_path: Union[str, Path], input_data: np.ndarray
+    model_path: Union[str, Path], input_data: DataLike
 ) -> np.ndarray:
     # 모델 초기화
     model = keras.models.load_model(model_path)  # type: ignore

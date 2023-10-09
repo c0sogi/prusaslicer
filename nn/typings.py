@@ -9,6 +9,7 @@ from typing import (
     TypedDict,
     Union,
 )
+import numpy as np
 import pandas as pd
 
 import tensorflow as tf
@@ -16,7 +17,9 @@ import tensorflow as tf
 if TYPE_CHECKING:
     from .config import BaseModelConfig
 
-DataLike = Union[pd.DataFrame, List[pd.DataFrame]]
+SingleData = Union[pd.DataFrame, np.ndarray]
+ListData = Union[List[pd.DataFrame], List[np.ndarray]]
+DataLike = Union[SingleData, ListData]
 
 HyperParamValue = Union[int, float]
 HyperParamsDict = Dict[str, HyperParamValue]

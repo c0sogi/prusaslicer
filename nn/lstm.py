@@ -1,6 +1,6 @@
 # flake8: noqa
 from dataclasses import asdict
-from typing import Dict, Union
+from typing import Dict, List, Union
 
 import tensorflow as tf
 from keras import Model
@@ -64,7 +64,7 @@ class LSTM(LSTMFrame):
         self.optimizer = Adam(learning_rate=model_config.lr)
 
         # Encoder
-        self.encoder_dense = tf.keras.layers.Dense(
+        self.encoder_dense = Dense(
             model_config.lstm_units, activation=model_config.activation
         )
         self.encoder_lstm = LSTMLayer(
@@ -85,23 +85,23 @@ class LSTM(LSTMFrame):
             metrics=model_config.metrics,
         )
 
-    def call(self, inputs: tf.Tensor, training: bool = False):
+    def call(self, inputs: List[tf.Tensor], training: bool = False):
         if training:
-            (
-                encoder_input,
-                decoder_input,
-            ) = inputs  # Directly unpack the two inputs
-            encoder_output, state_h, state_c = self.encoder_lstm(
+            assert isinstance(inputs, list) and len(inputs) == 2, (
+                "LSTM model must be trained with two inputs: "
+                "encoder_input and decoder_input"
+            )
+            encoder_input, decoder_input = inputs
+            encoder_output, state_h, state_c = self.encoder_lstm(  # type: ignore
                 self.encoder_dense(encoder_input)
             )
             decoder_output = self.decoder_lstm(
                 decoder_input, initial_state=[state_h, state_c]
             )
-
             return self.decoder_dense(decoder_output)
         else:
             encoder_input = inputs
-            encoder_output, state_h, state_c = self.encoder_lstm(
+            encoder_output, state_h, state_c = self.encoder_lstm(  # type: ignore
                 self.encoder_dense(encoder_input)
             )
             decoder_seq = tf.zeros(
