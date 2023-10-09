@@ -87,12 +87,13 @@ class LSTM(LSTMFrame):
 
     def call(self, inputs: List[tf.Tensor], training: bool = False):
         if training:
-            assert isinstance(inputs, list) and len(inputs) == 2, (
+            assert isinstance(inputs, (list, tuple)) and len(inputs) == 2, (
                 "LSTM model must be trained with two inputs: "
-                "encoder_input and decoder_input"
+                "encoder_input and decoder_input.\n"
+                f"inputs: {inputs}"
             )
             encoder_input, decoder_input = inputs
-            encoder_output, state_h, state_c = self.encoder_lstm(  # type: ignore
+            _, state_h, state_c = self.encoder_lstm(  # type: ignore
                 self.encoder_dense(encoder_input)
             )
             decoder_output = self.decoder_lstm(
@@ -101,7 +102,7 @@ class LSTM(LSTMFrame):
             return self.decoder_dense(decoder_output)
         else:
             encoder_input = inputs
-            encoder_output, state_h, state_c = self.encoder_lstm(  # type: ignore
+            _, state_h, state_c = self.encoder_lstm(  # type: ignore
                 self.encoder_dense(encoder_input)
             )
             decoder_seq = tf.zeros(
