@@ -14,7 +14,7 @@ def inference(
     model_path: Union[str, Path], input_data: DataLike
 ) -> np.ndarray:
     # 모델 초기화
-    model = keras.models.load_model(model_path)  # type: ignore
+    model = keras.models.load_model(model_path)
     assert isinstance(model, keras.Model), type(model)
     if model is None:
         raise ValueError(f"Model not found: {model_path}")

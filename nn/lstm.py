@@ -6,6 +6,7 @@ import tensorflow as tf
 from keras import Model
 from keras.layers import LSTM as LSTMLayer
 from keras.layers import Dense, TimeDistributed
+from keras.models import load_model
 from keras.optimizers import Adam
 from keras.src.engine import data_adapter
 
@@ -64,16 +65,32 @@ class LSTM(LSTMFrame):
         self.optimizer = Adam(learning_rate=model_config.lr)
 
         # Encoder
-        self.encoder_dense = Dense(
-            model_config.lstm_units, activation=model_config.activation
+        ann = load_model(model_config.ann_model_path)
+        assert isinstance(ann, Model), type(ann)
+        ann.trainable = False
+
+        # Propagate this input through all layers of 'ann' up to 'dense_2'
+        input_tensor = ann.layers[0].output
+        x = input_tensor
+        for layer in ann.layers[1:-1]:
+            # start from the layer after the InputLayer and skip the last layer
+            x = layer(x)
+
+        # Now x holds the output of 'dense_2'. We create a new model with input_tensor as input and x as output.
+        self.encoder = Model(inputs=input_tensor, outputs=x)
+        self.encoder.trainable = False
+        self.state_h_transform = Dense(
+            ann.model_config.n2,
+            activation=model_config.state_transform_activation,
         )
-        self.encoder_lstm = LSTMLayer(
-            model_config.lstm_units, return_state=True
+        self.state_c_transform = Dense(
+            ann.model_config.n2,
+            activation=model_config.state_transform_activation,
         )
 
         # Decoder
         self.decoder_lstm = LSTMLayer(
-            model_config.lstm_units, return_sequences=True
+            ann.model_config.n2, return_sequences=True
         )
         self.decoder_dense = TimeDistributed(Dense(model_config.dim_out))
         self.compile(
@@ -85,6 +102,30 @@ class LSTM(LSTMFrame):
             metrics=model_config.metrics,
         )
 
+    @tf.function
+    def decode_sequence(self, encoder_output: tf.Tensor):
+        decoder_buffer = tf.zeros(
+            (tf.shape(encoder_output)[0], 1, self.model_config.dim_out)
+        )
+
+        state_h, state_c = encoder_output, encoder_output
+        all_outputs = tf.TensorArray(
+            dtype=tf.float32,
+            size=self.model_config.seq_len,
+            dynamic_size=True,
+        )
+
+        for t in tf.range(self.model_config.seq_len):
+            decoder_output = self.decoder_lstm(
+                decoder_buffer, initial_state=[state_h, state_c]
+            )
+            decoder_buffer = self.decoder_dense(decoder_output)
+            all_outputs = all_outputs.write(t, decoder_buffer)
+        return tf.reshape(
+            all_outputs.stack(),
+            [-1, self.model_config.seq_len, self.model_config.dim_out],
+        )
+
     def call(self, inputs: List[tf.Tensor], training: bool = False):
         if training:
             assert isinstance(inputs, (list, tuple)) and len(inputs) == 2, (
@@ -93,37 +134,21 @@ class LSTM(LSTMFrame):
                 f"inputs: {inputs}"
             )
             encoder_input, decoder_input = inputs
-            _, state_h, state_c = self.encoder_lstm(  # type: ignore
-                self.encoder_dense(encoder_input)
-            )
-            decoder_output = self.decoder_lstm(
+            encoder_output = self.encoder(encoder_input)
+
+            # Assuming the encoder output can be used as the initial state for the decoder LSTM.
+            state_h = self.state_h_transform(encoder_output)
+            state_c = self.state_c_transform(encoder_output)
+
+            decoder_output = self.decoder_lstm(  # type: ignore
                 decoder_input, initial_state=[state_h, state_c]
             )
             return self.decoder_dense(decoder_output)
+
         else:
             encoder_input = inputs
-            _, state_h, state_c = self.encoder_lstm(  # type: ignore
-                self.encoder_dense(encoder_input)
-            )
-            decoder_seq = tf.zeros(
-                (tf.shape(encoder_input)[0], 1, self.model_config.dim_out)
-            )  # Assuming the output dimension is model_config.dim_out
-
-            all_outputs = tf.TensorArray(
-                dtype=tf.float32,
-                size=self.model_config.seq_len,
-                dynamic_size=False,
-                infer_shape=True,
-            )
-
-            for t in tf.range(self.model_config.seq_len):
-                decoder_output = self.decoder_lstm(
-                    decoder_seq, initial_state=[state_h, state_c]
-                )
-                decoder_seq = self.decoder_dense(decoder_output)
-                all_outputs = all_outputs.write(t, decoder_seq)
-
-            return tf.concat(all_outputs.stack(), axis=1)
+            encoder_output = self.encoder(encoder_input)
+            return self.decode_sequence(encoder_output)
 
 
 # import tensorflow as tf

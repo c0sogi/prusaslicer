@@ -3,9 +3,10 @@ from functools import reduce
 import json
 import multiprocessing
 import random
-from typing import Iterable
+from typing import Iterable, Tuple
 import unittest
 from uuid import uuid4
+import numpy as np
 
 import pandas as pd
 
@@ -51,6 +52,12 @@ class TestANN(unittest.TestCase):
             normalize_layer=False,
             dim_out=2,
         )
+        self.all_hyper_params = {
+            "lr": (0.001,),
+            "n1": (20,),
+            "n2": (10,),
+            "n3": (5, 10),
+        }
         dataset = read_all(dropna=True)
         train_inputs = dataset[self.input_params].astype(float)
         train_outputs = dataset[self.output_params].astype(float)
@@ -80,47 +87,50 @@ class TestANN(unittest.TestCase):
         print(self.train_inputs.shape, self.train_outputs.shape)
 
     def test_train_and_inference(self):
-        all_hyper_params = {
-            "lr": (0.001,),
-            "n1": (20,),
-            "n2": (10,),
-            "n3": (5, 10),
-        }
+        results = self.trainer.hyper_train(self.all_hyper_params)
+        num_hyper_params = reduce(
+            lambda x, y: x * len(y), self.all_hyper_params.values(), 1
+        )
+        for fstem, phist in results:
+            num_hyper_params -= 1
+            json.dumps(phist["train_output"], indent=4)
+            self.test_inference(fstem + ".keras")
 
-        results = self.trainer.hyper_train(all_hyper_params)
-        dataset = random.sample(
+        self.assertEqual(num_hyper_params, 0)
+
+    def test_inference(
+        self,
+        model_path: str = r".tmp\434ce9d21fab4746b794283774c0c54e\ANN_E4453[LR=0.001][N1=20][N2=10][N3=10].keras",
+    ):
+        x_test, y_test = self.test_data
+        y_pred = inference(model_path, x_test)
+        print(f"prediction: {y_pred}, true: {y_test}")
+        strength_pred = float(y_pred[0][0])
+        strength_true = float(y_test[0][0])
+        self.assertAlmostEqual(
+            strength_pred, strength_true, delta=strength_true * 0.5
+        )
+        dimension_pred = float(y_pred[0][1])
+        dimension_true = float(y_test[0][1])
+        self.assertAlmostEqual(
+            dimension_pred, dimension_true, delta=dimension_true * 1.0
+        )
+
+    @property
+    def test_data(self) -> Tuple[np.ndarray, np.ndarray]:
+        x_test, y_test = random.sample(
             [
                 data
                 for data in self.data_loader.dataset_batch_iterator(
                     batch_size=1
                 )
             ],
-            k=len(results),
+            k=1,
+        )[0]
+        assert isinstance(x_test, pd.DataFrame) and isinstance(
+            y_test, pd.DataFrame
         )
-        num_hyper_params = reduce(
-            lambda x, y: x * len(y), all_hyper_params.values(), 1
-        )
-        for (x_test, y_test), (fstem, phist) in zip(dataset, results):
-            assert isinstance(x_test, pd.DataFrame) and isinstance(
-                y_test, pd.DataFrame
-            )
-            x_test, y_test = x_test.to_numpy(), y_test.to_numpy()
-            num_hyper_params -= 1
-            json.dumps(phist["train_output"], indent=4)
-            y_pred = inference(f"{fstem}.keras", x_test.reshape(1, -1))
-            print(f"{fstem} prediction: {y_pred}, true: {y_test}")
-            strength_pred = float(y_pred[0][0])
-            strength_true = float(y_test[0][0])
-            self.assertAlmostEqual(
-                strength_pred, strength_true, delta=strength_true * 0.5
-            )
-            dimension_pred = float(y_pred[0][1])
-            dimension_true = float(y_test[0][1])
-            self.assertAlmostEqual(
-                dimension_pred, dimension_true, delta=dimension_true * 1.0
-            )
-
-        self.assertEqual(num_hyper_params, 0)
+        return x_test.to_numpy(), y_test.to_numpy()
 
 
 class TestLSTM(unittest.TestCase):

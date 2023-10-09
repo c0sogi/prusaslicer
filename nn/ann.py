@@ -4,9 +4,9 @@ from typing import Dict, Union
 
 import tensorflow as tf
 from keras import Model, initializers
-from keras.layers import Dense, Dropout, Layer, LayerNormalization
+from keras.layers import Dense, Dropout, InputLayer, LayerNormalization
 from keras.optimizers import Adam
-from keras.regularizers import l1_l2, l1, l2
+from keras.regularizers import l1, l1_l2, l2
 from keras.src.engine import data_adapter
 
 from .config import ANNModelConfig
@@ -77,6 +77,7 @@ class ANN(ANNFrame):
 
         # Define layers
         activation = model_config.activation
+        self.input_layer = InputLayer(input_shape=(model_config.dim_in,))
         self.dense1 = Dense(
             units=model_config.n1,
             activation=activation,
@@ -128,7 +129,7 @@ class ANN(ANNFrame):
         )
 
     def call(self, inputs: tf.Tensor, training: bool = False):
-        x = self.dense1(inputs)
+        x = self.dense1(self.input_layer(inputs))
         if self.norm1 is not None:
             x = self.norm1(x)
         if self.dropout1 is not None:
