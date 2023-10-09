@@ -26,6 +26,8 @@ class LSTMFrame(Model):
 
         with tf.GradientTape() as tape:
             y_pred = self(x, training=True)  # Forward pass
+            # tf.print("y_true:", y)
+            # tf.print("y_pred:", y_pred)
             loss = self.compiled_loss(y, y_pred)  # type: ignore
 
         # Compute gradients and update weights
@@ -69,36 +71,35 @@ class LSTM(LSTMFrame):
         assert isinstance(ann, Model), type(ann)
         ann.trainable = False
 
-        # Propagate this input through all layers of 'ann' up to 'dense_2'
+        # Propagate this input through ann
         input_tensor = ann.layers[0].output
         x = input_tensor
+        # start from the layer after the InputLayer and skip the last layer
         for layer in ann.layers[1:-1]:
-            # start from the layer after the InputLayer and skip the last layer
             x = layer(x)
-
-        # Now x holds the output of 'dense_2'. We create a new model with input_tensor as input and x as output.
         self.encoder = Model(inputs=input_tensor, outputs=x)
         self.encoder.trainable = False
         self.state_h_transform = Dense(
             ann.model_config.n2,
             activation=model_config.state_transform_activation,
+            input_shape=(ann.layers[-2].units,),
         )
         self.state_c_transform = Dense(
             ann.model_config.n2,
             activation=model_config.state_transform_activation,
+            input_shape=(ann.layers[-2].units,),
         )
 
         # Decoder
         self.decoder_lstm = LSTMLayer(
-            ann.model_config.n2, return_sequences=True
+            ann.model_config.n2,
+            return_sequences=True,
+            input_shape=(model_config.seq_len, model_config.dim_out),
         )
         self.decoder_dense = TimeDistributed(Dense(model_config.dim_out))
         self.compile(
             optimizer=self.optimizer,
-            loss=weighted_loss(
-                *model_config.loss_weights,
-                loss_funcs=model_config.loss_funcs,
-            ),
+            loss=model_config.loss_funcs,
             metrics=model_config.metrics,
         )
 
@@ -108,7 +109,8 @@ class LSTM(LSTMFrame):
             (tf.shape(encoder_output)[0], 1, self.model_config.dim_out)
         )
 
-        state_h, state_c = encoder_output, encoder_output
+        state_h = self.state_h_transform(encoder_output)
+        state_c = self.state_c_transform(encoder_output)
         all_outputs = tf.TensorArray(
             dtype=tf.float32,
             size=self.model_config.seq_len,
@@ -116,35 +118,38 @@ class LSTM(LSTMFrame):
         )
 
         for t in tf.range(self.model_config.seq_len):
-            decoder_output = self.decoder_lstm(
-                decoder_buffer, initial_state=[state_h, state_c]
+            decoder_buffer = self.decoder_dense(
+                self.decoder_lstm(
+                    decoder_buffer, initial_state=[state_h, state_c]
+                )
             )
-            decoder_buffer = self.decoder_dense(decoder_output)
             all_outputs = all_outputs.write(t, decoder_buffer)
-        return tf.reshape(
+        result = tf.reshape(
             all_outputs.stack(),
             [-1, self.model_config.seq_len, self.model_config.dim_out],
         )
+        return result
+
+    # def call(self, inputs: List[tf.Tensor], training: bool = False):
+    #     if isinstance(inputs, (list, tuple)):
+    #         assert len(inputs) == 2
+    #         encoder_input, _ = inputs
+    #     else:
+    #         encoder_input = inputs
+    #     encoder_output = self.encoder(encoder_input)
+    #     return self.decode_sequence(encoder_output)
 
     def call(self, inputs: List[tf.Tensor], training: bool = False):
-        if training:
-            assert isinstance(inputs, (list, tuple)) and len(inputs) == 2, (
-                "LSTM model must be trained with two inputs: "
-                "encoder_input and decoder_input.\n"
-                f"inputs: {inputs}"
-            )
+        if isinstance(inputs, (list, tuple)):
+            assert len(inputs) == 2
             encoder_input, decoder_input = inputs
             encoder_output = self.encoder(encoder_input)
-
-            # Assuming the encoder output can be used as the initial state for the decoder LSTM.
             state_h = self.state_h_transform(encoder_output)
             state_c = self.state_c_transform(encoder_output)
-
             decoder_output = self.decoder_lstm(  # type: ignore
                 decoder_input, initial_state=[state_h, state_c]
             )
             return self.decoder_dense(decoder_output)
-
         else:
             encoder_input = inputs
             encoder_output = self.encoder(encoder_input)

@@ -6,7 +6,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Type, Union
+from typing import Dict, List, Mapping, Optional, Tuple, Type, Union
 
 import numpy as np
 import tensorflow as tf
@@ -268,7 +268,7 @@ class Trainer:
     def get_filename_without_ext(
         self,
         epochs: Optional[int] = None,
-        hyper_params: Optional[Dict[str, Union[int, float]]] = None,
+        hyper_params: Optional[Mapping[str, Union[int, float]]] = None,
         kfold_case: Optional[int] = None,
         add_datetime: bool = False,
     ) -> str:

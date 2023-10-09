@@ -1,10 +1,10 @@
 from typing import (
     TYPE_CHECKING,
     Callable,
-    Dict,
     Iterable,
     List,
     Literal,
+    Mapping,
     NotRequired,
     TypedDict,
     Union,
@@ -21,9 +21,8 @@ SingleData = Union[pd.DataFrame, np.ndarray]
 ListData = Union[List[pd.DataFrame], List[np.ndarray]]
 DataLike = Union[SingleData, ListData]
 
-HyperParamValue = Union[int, float]
-HyperParamsDict = Dict[str, HyperParamValue]
-HyperParamsDictAll = Dict[str, Iterable[HyperParamValue]]
+HyperParamsDict = Mapping[str, Union[int, float]]
+HyperParamsDictAll = Mapping[str, Union[Iterable[int], Iterable[float]]]
 
 
 LossKeys = Literal[

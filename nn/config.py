@@ -91,14 +91,16 @@ class ANNModelConfig(BaseModelConfig):
 
 @dataclass
 class LSTMModelConfig(BaseModelConfig):
-    seq_len: int = -1
+    seq_len: int = 512
     ann_model_path: str = ""
     state_transform_activation: str = "tanh"
 
     def __post_init__(self) -> None:
         super().__post_init__()
         assert self.seq_len > 0, "Sequence Length는 0보다 커야 합니다."
-        assert Path(self.ann_model_path).exists(), "ANN 모델이 존재하지 않습니다."
+        assert (
+            self.ann_model_path and Path(self.ann_model_path).exists()
+        ), "ANN 모델이 존재하지 않습니다."
 
 
 # @dataclass

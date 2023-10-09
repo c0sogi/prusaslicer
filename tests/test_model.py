@@ -3,7 +3,7 @@ from functools import reduce
 import json
 import multiprocessing
 import random
-from typing import Iterable, Tuple
+from typing import Iterable, List, Tuple
 import unittest
 from uuid import uuid4
 import numpy as np
@@ -54,9 +54,9 @@ class TestANN(unittest.TestCase):
         )
         self.all_hyper_params = {
             "lr": (0.001,),
-            "n1": (20,),
+            "n1": (10,),
             "n2": (10,),
-            "n3": (5, 10),
+            "n3": (10,),
         }
         dataset = read_all(dropna=True)
         train_inputs = dataset[self.input_params].astype(float)
@@ -136,33 +136,46 @@ class TestANN(unittest.TestCase):
 class TestLSTM(unittest.TestCase):
     def setUp(self) -> None:
         self.epoch = 10000
-        self.print_per_epoch = self.patience = self.epoch // 10
+        self.print_per_epoch = 1
+        self.patience = self.epoch // 10
         self.model_class = LSTM
         self.input_params = LSTMInputParams
         self.output_params = LSTMOutputParams
         self.model_config = LSTMModelConfig(
             output_path=f".tmp/{uuid4().hex}",
-            metrics=["mse", "mae", "mape"],
+            metrics=["mse", "mae"],
             kfold_splits=0,
             print_per_epoch=self.print_per_epoch,
-            batch_size=100,
+            batch_size=1,
             epochs=self.epoch,
             patience=self.patience,
-            loss_funcs=["mae"],
-            loss_weights=[0.5],
+            loss_funcs=["mse"],
+            loss_weights=[1.0],
             l1_reg=None,
             l2_reg=None,
             dropout_rate=0.0,
             normalize_layer=False,
             dim_out=1,
+            seq_len=512,
+            ann_model_path=r".tmp\4aef6cb7597d43e2904333756b2a44d4\ANN_E10000[LR=0.001][N1=10][N2=10][N3=10].keras",
         )
         dataset = read_all(dropna=True)[self.input_params]
-        seq_data = dataset["stress"].apply(
-            lambda x: pd.Series(normalize_1d_sequence(x, 512))
+        encoder_inputs = (
+            dataset.drop(columns=["stress"]).astype(float).to_numpy()
         )
-        non_seq_data = dataset.drop(columns=["stress"]).astype(float)
-        self.train_inputs = [seq_data, non_seq_data]
-        self.train_outputs = seq_data
+        decoder_outputs = (
+            dataset["stress"]
+            .apply(
+                lambda x: pd.Series(
+                    normalize_1d_sequence(x, self.model_config.seq_len)
+                )
+            )
+            .to_numpy()
+        )[:, :, np.newaxis]
+        decoder_inputs = np.zeros_like(decoder_outputs)
+        decoder_inputs[:, 1:, :] = decoder_outputs[:, :-1, :]
+        self.train_inputs = [encoder_inputs, decoder_inputs]
+        self.train_outputs = decoder_outputs
         self.data_loader = DataLoader(
             model_config=self.model_config,
             train_inputs=self.train_inputs,
@@ -187,10 +200,7 @@ class TestLSTM(unittest.TestCase):
         )
 
     def test_train_and_inference(self):
-        all_hyper_params = {
-            "seq_len": (512,),
-            "lstm_units": (100,),
-        }
+        all_hyper_params = {"seq_len": (self.model_config.seq_len,)}
 
         results = self.trainer.hyper_train(all_hyper_params)
         dataset = random.sample(
@@ -212,7 +222,7 @@ class TestLSTM(unittest.TestCase):
             x_test, y_test = x_test, y_test.to_numpy()
             num_hyper_params -= 1
             json.dumps(phist["train_output"], indent=4)
-            y_pred = inference(f"{fstem}.keras", x_test)
+            y_pred = inference(f"{fstem}.keras", x_test[0])
         #     print(f"{fstem} prediction: {y_pred}, true: {y_test}")
         #     strength_pred = float(y_pred[0][0])
         #     strength_true = float(y_test[0][0])
@@ -226,3 +236,40 @@ class TestLSTM(unittest.TestCase):
         #     )
 
         # self.assertEqual(num_hyper_params, 0)
+
+    def test_inference(
+        self,
+        model_path: str = r".tmp\0d2294abbf714dcd9c328fadd665ccb7\LSTM_E4219[SEQ_LEN=400].keras",
+    ):
+        x_test, y_test = self.test_data
+        y_pred = inference(model_path, x_test)
+        # print(f"prediction: {y_pred}, true: {y_test}")
+        # strength_pred = float(y_pred[0][0])
+        # strength_true = float(y_test[0][0])
+        # self.assertAlmostEqual(
+        #     strength_pred, strength_true, delta=strength_true * 0.5
+        # )
+        # dimension_pred = float(y_pred[0][1])
+        # dimension_true = float(y_test[0][1])
+        # self.assertAlmostEqual(
+        #     dimension_pred, dimension_true, delta=dimension_true * 1.0
+        # )
+
+    @property
+    def test_data(self) -> Tuple[np.ndarray, np.ndarray]:
+        (x_test, _), y_test = random.sample(
+            [
+                data
+                for data in self.data_loader.dataset_batch_iterator(
+                    batch_size=1
+                )
+            ],
+            k=1,
+        )[0]
+        assert isinstance(x_test, np.ndarray) and isinstance(
+            y_test, np.ndarray
+        ), (
+            type(x_test),
+            type(y_test),
+        )
+        return x_test, y_test
