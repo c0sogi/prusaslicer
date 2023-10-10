@@ -87,11 +87,10 @@ class TestANN(unittest.TestCase):
         print(self.train_inputs.shape, self.train_outputs.shape)
 
     def test_train_and_inference(self):
-        results = self.trainer.hyper_train(self.all_hyper_params)
         num_hyper_params = reduce(
             lambda x, y: x * len(y), self.all_hyper_params.values(), 1
         )
-        for fstem, phist in results:
+        for fstem, phist in self.trainer.hyper_train(self.all_hyper_params):
             num_hyper_params -= 1
             json.dumps(phist["train_output"], indent=4)
             self.test_inference(fstem + ".keras")
@@ -135,7 +134,7 @@ class TestANN(unittest.TestCase):
 
 class TestLSTM(unittest.TestCase):
     def setUp(self) -> None:
-        self.epoch = 10000
+        self.epoch = 5000
         self.print_per_epoch = 1
         self.patience = self.epoch // 10
         self.model_class = LSTM
@@ -146,7 +145,7 @@ class TestLSTM(unittest.TestCase):
             metrics=["mse", "mae"],
             kfold_splits=0,
             print_per_epoch=self.print_per_epoch,
-            batch_size=1,
+            batch_size=100,
             epochs=self.epoch,
             patience=self.patience,
             loss_funcs=["mse"],
@@ -157,7 +156,7 @@ class TestLSTM(unittest.TestCase):
             normalize_layer=False,
             dim_out=1,
             seq_len=512,
-            ann_model_path=r".tmp\4aef6cb7597d43e2904333756b2a44d4\ANN_E10000[LR=0.001][N1=10][N2=10][N3=10].keras",
+            ann_model_path="ANN_E10000[LR=0.001][N1=10][N2=10][N3=10].keras",
         )
         dataset = read_all(dropna=True)[self.input_params]
         encoder_inputs = (
@@ -201,28 +200,13 @@ class TestLSTM(unittest.TestCase):
 
     def test_train_and_inference(self):
         all_hyper_params = {"seq_len": (self.model_config.seq_len,)}
-
-        results = self.trainer.hyper_train(all_hyper_params)
-        dataset = random.sample(
-            [
-                data
-                for data in self.data_loader.dataset_batch_iterator(
-                    batch_size=1
-                )
-            ],
-            k=1,
-        )
         num_hyper_params = reduce(
             lambda x, y: x * len(y), all_hyper_params.values(), 1
         )
-        for (x_test, y_test), (fstem, phist) in zip(dataset, results):
-            assert isinstance(x_test, list) and isinstance(
-                y_test, pd.DataFrame
-            )
-            x_test, y_test = x_test, y_test.to_numpy()
+        for fstem, phist in self.trainer.hyper_train(all_hyper_params):
             num_hyper_params -= 1
             json.dumps(phist["train_output"], indent=4)
-            y_pred = inference(f"{fstem}.keras", x_test[0])
+            self.test_inference(fstem + ".keras")
         #     print(f"{fstem} prediction: {y_pred}, true: {y_test}")
         #     strength_pred = float(y_pred[0][0])
         #     strength_true = float(y_test[0][0])
@@ -234,42 +218,52 @@ class TestLSTM(unittest.TestCase):
         #     self.assertAlmostEqual(
         #         dimension_pred, dimension_true, delta=dimension_true * 1.0
         #     )
-
-        # self.assertEqual(num_hyper_params, 0)
+        self.assertEqual(num_hyper_params, 0)
 
     def test_inference(
         self,
-        model_path: str = r".tmp\0d2294abbf714dcd9c328fadd665ccb7\LSTM_E4219[SEQ_LEN=400].keras",
+        model_path: str = r"LSTM_E10000[SEQ_LEN=512].keras",
     ):
         x_test, y_test = self.test_data
         y_pred = inference(model_path, x_test)
-        # print(f"prediction: {y_pred}, true: {y_test}")
-        # strength_pred = float(y_pred[0][0])
-        # strength_true = float(y_test[0][0])
-        # self.assertAlmostEqual(
-        #     strength_pred, strength_true, delta=strength_true * 0.5
-        # )
-        # dimension_pred = float(y_pred[0][1])
-        # dimension_true = float(y_test[0][1])
-        # self.assertAlmostEqual(
-        #     dimension_pred, dimension_true, delta=dimension_true * 1.0
-        # )
+        assert (
+            y_pred.shape == y_test.shape
+        ), f"{y_pred.shape} != {y_test.shape}"
+        seq_len = y_pred.shape[1]
+        y_pred_low, y_pred_mid, y_pred_high = (
+            y_pred[0, seq_len // 4, 0],  # type: ignore
+            y_pred[0, seq_len // 2, 0],  # type: ignore
+            y_pred[0, seq_len * 3 // 4, 0],  # type: ignore
+        )
+        y_test_low, y_test_mid, y_test_high = (
+            y_test[0, seq_len // 4, 0],  # type: ignore
+            y_test[0, seq_len // 2, 0],  # type: ignore
+            y_test[0, seq_len * 3 // 4, 0],  # type: ignore
+        )
+        print(f"y_pred: {y_pred_low}, {y_pred_mid}, {y_pred_high}")
+        print(f"y_test: {y_test_low}, {y_test_mid}, {y_test_high}")
+        self.assertAlmostEqual(
+            y_pred_low, y_test_low, delta=y_test_low * 0.5
+        )
+        self.assertAlmostEqual(
+            y_pred_mid, y_test_mid, delta=y_test_mid * 0.5
+        )
+        self.assertAlmostEqual(
+            y_pred_high, y_test_high, delta=y_test_high * 0.5
+        )
 
     @property
     def test_data(self) -> Tuple[np.ndarray, np.ndarray]:
-        (x_test, _), y_test = random.sample(
-            [
-                data
-                for data in self.data_loader.dataset_batch_iterator(
-                    batch_size=1
-                )
-            ],
-            k=1,
-        )[0]
+        x_test = self.train_inputs[0]
+        y_test = self.train_outputs
         assert isinstance(x_test, np.ndarray) and isinstance(
             y_test, np.ndarray
-        ), (
-            type(x_test),
-            type(y_test),
+        ), f"{type(x_test)} & {type(y_test)}"
+        assert (
+            x_test.shape[0] == y_test.shape[0]
+        ), f"{x_test.shape} != {y_test.shape}"
+        random_idx = random.randint(0, x_test.shape[0] - 1)
+        return (
+            x_test[random_idx : random_idx + 1],
+            y_test[random_idx : random_idx + 1],
         )
-        return x_test, y_test

@@ -9,6 +9,7 @@ PRIVATE_*
 *.h5
 *.keras
 *.pkl
+*.txt
 checkpoint/*
 !printer/*
 !template.ini

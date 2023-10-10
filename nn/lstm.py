@@ -1,6 +1,7 @@
 # flake8: noqa
 from dataclasses import asdict
-from typing import Dict, List, Union
+from datetime import datetime
+from typing import Dict, List, Tuple, Union
 
 import tensorflow as tf
 from keras import Model
@@ -16,7 +17,7 @@ from .losses import weighted_loss
 
 class LSTMFrame(Model):
     def train_step(
-        self, data: tf.Tensor
+        self, data: Tuple[Tuple[tf.Tensor, tf.Tensor], tf.Tensor]
     ) -> Dict[str, Union[float, tf.Tensor]]:
         (
             x,
@@ -26,8 +27,18 @@ class LSTMFrame(Model):
 
         with tf.GradientTape() as tape:
             y_pred = self(x, training=True)  # Forward pass
-            # tf.print("y_true:", y)
-            # tf.print("y_pred:", y_pred)
+            tf.print(
+                "y_pred:",
+                y_pred[0, 0, 0],  # type: ignore
+                y_pred[0, tf.shape(y_pred)[1] // 2, 0],  # type: ignore
+                y_pred[0, -1, 0],  # type: ignore
+            )
+            tf.print(
+                "y_true:",
+                y[0, 0, 0],  # type: ignore
+                y[0, tf.shape(y)[1] // 2, 0],  # type: ignore
+                y[0, -1, 0],  # type: ignore
+            )
             loss = self.compiled_loss(y, y_pred)  # type: ignore
 
         # Compute gradients and update weights
@@ -68,8 +79,15 @@ class LSTM(LSTMFrame):
 
         # Encoder
         ann = load_model(model_config.ann_model_path)
+        with open(
+            f"model_summary_ann{datetime.now().strftime('%Y%m%d%H%M')}.txt",
+            "a",
+        ) as f:
+            f.write(str(ann.get_weights()))
         assert isinstance(ann, Model), type(ann)
         ann.trainable = False
+        for layer in ann.layers:
+            layer.trainable = False
 
         # Propagate this input through ann
         input_tensor = ann.layers[0].output
@@ -94,6 +112,7 @@ class LSTM(LSTMFrame):
         self.decoder_lstm = LSTMLayer(
             ann.model_config.n2,
             return_sequences=True,
+            return_state=True,
             input_shape=(model_config.seq_len, model_config.dim_out),
         )
         self.decoder_dense = TimeDistributed(Dense(model_config.dim_out))
@@ -103,42 +122,6 @@ class LSTM(LSTMFrame):
             metrics=model_config.metrics,
         )
 
-    @tf.function
-    def decode_sequence(self, encoder_output: tf.Tensor):
-        decoder_buffer = tf.zeros(
-            (tf.shape(encoder_output)[0], 1, self.model_config.dim_out)
-        )
-
-        state_h = self.state_h_transform(encoder_output)
-        state_c = self.state_c_transform(encoder_output)
-        all_outputs = tf.TensorArray(
-            dtype=tf.float32,
-            size=self.model_config.seq_len,
-            dynamic_size=True,
-        )
-
-        for t in tf.range(self.model_config.seq_len):
-            decoder_buffer = self.decoder_dense(
-                self.decoder_lstm(
-                    decoder_buffer, initial_state=[state_h, state_c]
-                )
-            )
-            all_outputs = all_outputs.write(t, decoder_buffer)
-        result = tf.reshape(
-            all_outputs.stack(),
-            [-1, self.model_config.seq_len, self.model_config.dim_out],
-        )
-        return result
-
-    # def call(self, inputs: List[tf.Tensor], training: bool = False):
-    #     if isinstance(inputs, (list, tuple)):
-    #         assert len(inputs) == 2
-    #         encoder_input, _ = inputs
-    #     else:
-    #         encoder_input = inputs
-    #     encoder_output = self.encoder(encoder_input)
-    #     return self.decode_sequence(encoder_output)
-
     def call(self, inputs: List[tf.Tensor], training: bool = False):
         if isinstance(inputs, (list, tuple)):
             assert len(inputs) == 2
@@ -146,14 +129,34 @@ class LSTM(LSTMFrame):
             encoder_output = self.encoder(encoder_input)
             state_h = self.state_h_transform(encoder_output)
             state_c = self.state_c_transform(encoder_output)
-            decoder_output = self.decoder_lstm(  # type: ignore
+            decoder_output, _, _ = self.decoder_lstm(  # type: ignore
                 decoder_input, initial_state=[state_h, state_c]
             )
             return self.decoder_dense(decoder_output)
         else:
             encoder_input = inputs
             encoder_output = self.encoder(encoder_input)
-            return self.decode_sequence(encoder_output)
+            state_h = self.state_h_transform(encoder_output)
+            state_c = self.state_c_transform(encoder_output)
+            decoder_buffer = tf.zeros(
+                (tf.shape(encoder_output)[0], 1, self.model_config.dim_out)
+            )
+            all_outputs = tf.TensorArray(
+                dtype=tf.float32,
+                size=self.model_config.seq_len,
+                dynamic_size=True,
+            )
+
+            for t in tf.range(self.model_config.seq_len):
+                lstm_out, state_h, state_c = self.decoder_lstm(
+                    decoder_buffer, initial_state=[state_h, state_c]
+                )  # type: ignore
+                decoder_buffer = self.decoder_dense(lstm_out)
+                all_outputs = all_outputs.write(t, decoder_buffer)
+            return tf.reshape(
+                all_outputs.stack(),
+                [-1, self.model_config.seq_len, self.model_config.dim_out],
+            )
 
 
 # import tensorflow as tf

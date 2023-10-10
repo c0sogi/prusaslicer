@@ -169,6 +169,8 @@ class Trainer:
             hyper_params=hyper_params,
             kfold_case=kfold_case,
         )
+        with open("model_summary_train.txt", "w") as f:
+            f.write(str(model.get_weights()))
         model.save(train_file_stem + ".keras")
         dump_pickle(Path(train_file_stem + ".pkl"), pickle_history)
         return train_file_stem, pickle_history
