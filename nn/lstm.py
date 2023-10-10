@@ -25,7 +25,6 @@ class LSTM(Model):
         assert len(input_shape) == 2, input_shape
         encoder_input_shape, decoder_input_shape = input_shape
         if input_shape is not None:
-            tf.print("input_shape:", input_shape, type(input_shape))
             self.build(encoder_input_shape)
 
     def test_step(
@@ -107,42 +106,42 @@ class LSTM(Model):
     ):
         if training:
             encoder_input, decoder_input = inputs
-            encoder_output = self.encoder(encoder_input)
-            state_h = self.state_h_transform(encoder_output)
-            state_c = self.state_c_transform(encoder_output)
-            decoder_output, _, _ = self.decoder_lstm(  # type: ignore
-                decoder_input, initial_state=[state_h, state_c]
-            )
-            return self.decoder_dense(decoder_output)
+            # encoder_output = self.encoder(encoder_input)
+            # state_h = self.state_h_transform(encoder_output)
+            # state_c = self.state_c_transform(encoder_output)
+            # decoder_output, _, _ = self.decoder_lstm(  # type: ignore
+            #     decoder_input, initial_state=[state_h, state_c]
+            # )
+            # return self.decoder_dense(decoder_output)
         else:
             encoder_input = inputs
-            encoder_output = self.encoder(encoder_input)
-            state_h = self.state_h_transform(encoder_output)
-            state_c = self.state_c_transform(encoder_output)
-            decoder_buffer = tf.zeros(
-                (tf.shape(encoder_output)[0], 1, self.model_config.dim_out)
+        encoder_output = self.encoder(encoder_input)
+        state_h = self.state_h_transform(encoder_output)
+        state_c = self.state_c_transform(encoder_output)
+        decoder_buffer = tf.zeros(
+            (tf.shape(encoder_output)[0], 1, self.model_config.dim_out)
+        )
+
+        initial_states = (decoder_buffer, state_h, state_c)
+
+        def step_fn(previous_states, _):
+            decoder_buffer, state_h, state_c = previous_states
+            lstm_out, state_h, state_c = self.decoder_lstm(  # type: ignore
+                decoder_buffer, initial_state=[state_h, state_c]
             )
+            decoder_buffer = self.decoder_dense(lstm_out)
+            return (decoder_buffer, state_h, state_c)
 
-            initial_states = (decoder_buffer, state_h, state_c)
+        all_outputs = tf.scan(
+            fn=step_fn,
+            elems=tf.range(self.model_config.seq_len),
+            initializer=initial_states,
+        )[0]
 
-            def step_fn(previous_states, _):
-                decoder_buffer, state_h, state_c = previous_states
-                lstm_out, state_h, state_c = self.decoder_lstm(  # type: ignore
-                    decoder_buffer, initial_state=[state_h, state_c]
-                )
-                decoder_buffer = self.decoder_dense(lstm_out)
-                return (decoder_buffer, state_h, state_c)
-
-            all_outputs = tf.scan(
-                fn=step_fn,
-                elems=tf.range(self.model_config.seq_len),
-                initializer=initial_states,
-            )[0]
-
-            return tf.reshape(
-                all_outputs,
-                [-1, self.model_config.seq_len, self.model_config.dim_out],
-            )
+        return tf.reshape(
+            all_outputs,
+            [-1, self.model_config.seq_len, self.model_config.dim_out],
+        )
 
 
 # import tensorflow as tf
