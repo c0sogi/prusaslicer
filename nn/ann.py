@@ -13,32 +13,7 @@ from .config import ANNModelConfig
 from .losses import weighted_loss
 
 
-class ANNFrame(Model):
-    def train_step(
-        self, data: tf.Tensor
-    ) -> Dict[str, Union[float, tf.Tensor]]:
-        (
-            x,
-            y,
-            sample_weight,
-        ) = data_adapter.unpack_x_y_sample_weight(data)
-
-        with tf.GradientTape() as tape:
-            y_pred = self(x, training=True)  # Forward pass
-            loss = self.compiled_loss(y, y_pred)  # type: ignore
-
-        # Compute gradients and update weights
-        trainable_vars = self.trainable_variables
-        gradients = tape.gradient(loss, trainable_vars)
-        self.optimizer.apply_gradients(zip(gradients, trainable_vars))
-
-        # Update and return metrics (assuming you've compiled the model with some metrics)
-        if self.compiled_metrics is not None:
-            self.compiled_metrics.update_state(y, y_pred, sample_weight)
-            return {m.name: m.result() for m in self.metrics}
-        else:
-            return {}
-
+class ANN(Model):
     def get_config(self):
         config = super().get_config()
         config.update({"model_config": asdict(self.model_config)})
@@ -53,8 +28,6 @@ class ANNFrame(Model):
             **config,
         )
 
-
-class ANN(ANNFrame):
     def __init__(self, model_config: ANNModelConfig, **kwargs):
         # Define model parameters
         self.model_config = model_config
@@ -128,22 +101,26 @@ class ANN(ANNFrame):
             metrics=model_config.metrics,
         )
 
-    def call(self, inputs: tf.Tensor, training: bool = False):
+    def call(self, inputs: tf.Tensor, training=False):
         x = self.dense1(self.input_layer(inputs))
+
         if self.norm1 is not None:
-            x = self.norm1(x)
+            x = self.norm1(x, training=training)
         if self.dropout1 is not None:
             x = self.dropout1(x, training=training)
+
         x = self.dense2(x)
         if self.norm2 is not None:
-            x = self.norm2(x)
+            x = self.norm2(x, training=training)
         if self.dropout2 is not None:
             x = self.dropout2(x, training=training)
+
         x = self.dense3(x)
         if self.norm3 is not None:
-            x = self.norm3(x)
+            x = self.norm3(x, training=training)
         if self.dropout3 is not None:
             x = self.dropout3(x, training=training)
+
         return self.dense_out(x)
 
 

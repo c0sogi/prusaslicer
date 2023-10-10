@@ -24,7 +24,6 @@ DataLike = Union[SingleData, ListData]
 HyperParamsDict = Mapping[str, Union[int, float]]
 HyperParamsDictAll = Mapping[str, Union[Iterable[int], Iterable[float]]]
 
-
 LossKeys = Literal[
     "mae",
     "mse",

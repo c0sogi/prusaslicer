@@ -32,7 +32,8 @@ logger = ApiLogger(__name__)
 class TestANN(unittest.TestCase):
     def setUp(self) -> None:
         self.epoch = 10000
-        self.print_per_epoch = self.patience = self.epoch // 10
+        self.print_per_epoch = self.epoch // 100
+        self.patience = self.epoch // 10
         self.model_class = ANN
         self.input_params = ANNInputParams
         self.output_params = ANNOutputParams
@@ -222,7 +223,7 @@ class TestLSTM(unittest.TestCase):
 
     def test_inference(
         self,
-        model_path: str = r"LSTM_E10000[SEQ_LEN=512].keras",
+        model_path: str = r".tmp\172689c286e24684a2d2ba234ce454e6\LSTM_E556[SEQ_LEN=512].keras",
     ):
         x_test, y_test = self.test_data
         y_pred = inference(model_path, x_test)

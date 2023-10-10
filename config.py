@@ -1,7 +1,7 @@
 # flake8: noqa
 
 # STL 파일 이름
-STL_FILENAME: str = "specimen5p.stl"
+STL_FILENAME: str = "specimen5.stl"
 # 필라멘트 옵션
 FAN_SPEEDS = (0,)  # (FS) 출력 도중 팬의 작동량, ABS는 0%, PLA는 100%
 BED_TEMPERATURES = (60, 80, 100)  # (BT) 베드의 온도

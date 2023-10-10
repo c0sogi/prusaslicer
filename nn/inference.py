@@ -15,8 +15,6 @@ def inference(
 ) -> np.ndarray:
     # 모델 초기화
     model = keras.models.load_model(model_path)
-    with open("model_summary_inference.txt", "a") as f:
-        f.write(str(model.get_weights()))
     assert isinstance(model, keras.Model), type(model)
     if model is None:
         raise ValueError(f"Model not found: {model_path}")
