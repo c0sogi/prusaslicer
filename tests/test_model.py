@@ -14,7 +14,7 @@ from nn.ann import ANN
 from nn.config import ANNModelConfig, LSTMModelConfig
 from nn.dataloader import DataLoader
 from nn.inference import inference
-from nn.lstm import LSTM
+from nn.lstm import EmbeddingAttentionLSTMRegressor
 from nn.schemas import (
     ANNInputParams,
     ANNOutputParams,
@@ -135,10 +135,10 @@ class TestANN(unittest.TestCase):
 
 class TestLSTM(unittest.TestCase):
     def setUp(self) -> None:
-        self.epoch = 5000
+        self.epoch = 1000
         self.print_per_epoch = 1
         self.patience = self.epoch // 10
-        self.model_class = LSTM
+        self.model_class = EmbeddingAttentionLSTMRegressor
         self.input_params = LSTMInputParams
         self.output_params = LSTMOutputParams
         self.model_config = LSTMModelConfig(
@@ -146,7 +146,7 @@ class TestLSTM(unittest.TestCase):
             metrics=["mse", "mae"],
             kfold_splits=0,
             print_per_epoch=self.print_per_epoch,
-            batch_size=100,
+            batch_size=1,
             epochs=self.epoch,
             patience=self.patience,
             loss_funcs=["mse"],
@@ -156,7 +156,7 @@ class TestLSTM(unittest.TestCase):
             dropout_rate=0.0,
             normalize_layer=False,
             dim_out=1,
-            seq_len=512,
+            seq_len=64,
             ann_model_path="ANN_E10000[LR=0.001][N1=10][N2=10][N3=10].keras",
         )
         dataset = read_all(dropna=True)[self.input_params]
@@ -174,7 +174,8 @@ class TestLSTM(unittest.TestCase):
         )[:, :, np.newaxis]
         decoder_inputs = np.zeros_like(decoder_outputs)
         decoder_inputs[:, 1:, :] = decoder_outputs[:, :-1, :]
-        self.train_inputs = [encoder_inputs, decoder_inputs]
+        # self.train_inputs = [encoder_inputs, decoder_inputs]
+        self.train_inputs = encoder_inputs
         self.train_outputs = decoder_outputs
         self.data_loader = DataLoader(
             model_config=self.model_config,
@@ -194,8 +195,7 @@ class TestLSTM(unittest.TestCase):
         print(self.train_inputs)
         print(self.train_outputs)
         print(
-            self.train_inputs[0].shape,
-            self.train_inputs[1].shape,
+            self.train_inputs.shape,
             self.train_outputs.shape,
         )
 
@@ -255,7 +255,7 @@ class TestLSTM(unittest.TestCase):
 
     @property
     def test_data(self) -> Tuple[np.ndarray, np.ndarray]:
-        x_test = self.train_inputs[0]
+        x_test = self.train_inputs
         y_test = self.train_outputs
         assert isinstance(x_test, np.ndarray) and isinstance(
             y_test, np.ndarray

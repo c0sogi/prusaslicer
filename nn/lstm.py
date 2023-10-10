@@ -5,8 +5,7 @@ from typing import Dict, List, Tuple, Union
 
 import tensorflow as tf
 from keras import Model
-from keras.layers import LSTM as LSTMLayer
-from keras.layers import Dense, TimeDistributed
+from keras.layers import LSTM, Dense, TimeDistributed, Layer
 from keras.models import load_model
 from keras.optimizers import Adam
 from keras.src.engine import data_adapter
@@ -14,29 +13,8 @@ from keras.src.engine import data_adapter
 from .config import LSTMModelConfig
 from .losses import weighted_loss
 
-Model.train_step
 
-Model.build_from_config
-
-
-class LSTM(Model):
-    def build_from_config(self, config: Dict) -> None:
-        input_shape = config["input_shape"]
-        assert len(input_shape) == 2, input_shape
-        encoder_input_shape, decoder_input_shape = input_shape
-        if input_shape is not None:
-            self.build(encoder_input_shape)
-
-    def test_step(
-        self, data: Tuple[tf.Tensor, tf.Tensor]
-    ) -> Dict[str, float]:
-        x, y, sample_weight = data_adapter.unpack_x_y_sample_weight(data)
-        x, _ = x
-        y_pred = self(x, training=False)
-        # Updates stateful loss metrics.
-        self.compute_loss(x, y, y_pred, sample_weight)
-        return self.compute_metrics(x, y, y_pred, sample_weight)
-
+class EmbeddingAttentionLSTMRegressor(tf.keras.Model):
     def get_config(self):
         config = super().get_config()
         config.update({"model_config": asdict(self.model_config)})
@@ -52,14 +30,8 @@ class LSTM(Model):
         )
 
     def __init__(self, model_config: LSTMModelConfig, **kwargs):
-        # Define model parameters
-        self.model_config = model_config
-        super().__init__(**kwargs)
-
-        # Define optimizer
+        super().__init__()
         self.optimizer = Adam(learning_rate=model_config.lr)
-
-        # Encoder
         ann = load_model(model_config.ann_model_path)
         assert isinstance(ann, Model), type(ann)
         ann.trainable = False
@@ -72,76 +44,75 @@ class LSTM(Model):
         # start from the layer after the InputLayer and skip the last layer
         for layer in ann.layers[1:-1]:
             x = layer(x)
-        self.encoder = Model(inputs=input_tensor, outputs=x)
-        self.encoder.trainable = False
-        self.state_h_transform = Dense(
-            ann.model_config.n2,
-            activation=model_config.state_transform_activation,
-            input_shape=(ann.layers[-2].units,),
+        self.embedding = Model(inputs=input_tensor, outputs=x)
+        self.embedding.trainable = False
+        self.rnn = LSTM(
+            ann.model_config.n2, return_sequences=True, return_state=True
         )
-        self.state_c_transform = Dense(
-            ann.model_config.n2,
-            activation=model_config.state_transform_activation,
-            input_shape=(ann.layers[-2].units,),
-        )
-
-        # Decoder
-        self.decoder_lstm = LSTMLayer(
-            ann.model_config.n2,
-            return_sequences=True,
-            return_state=True,
-            input_shape=(model_config.seq_len, model_config.dim_out),
-        )
-        self.decoder_dense = TimeDistributed(Dense(model_config.dim_out))
+        self.attention = BahdanauAttention(self.rnn.units)
+        self.output_layer = Dense(1)
+        self.model_config = model_config
         self.compile(
             optimizer=self.optimizer,
             loss=model_config.loss_funcs,
             metrics=model_config.metrics,
         )
 
-    def call(
-        self,
-        inputs: Union[Tuple[tf.Tensor, tf.Tensor], tf.Tensor],
-        training=False,
-    ):
-        if training:
-            encoder_input, decoder_input = inputs
-            # encoder_output = self.encoder(encoder_input)
-            # state_h = self.state_h_transform(encoder_output)
-            # state_c = self.state_c_transform(encoder_output)
-            # decoder_output, _, _ = self.decoder_lstm(  # type: ignore
-            #     decoder_input, initial_state=[state_h, state_c]
-            # )
-            # return self.decoder_dense(decoder_output)
-        else:
-            encoder_input = inputs
-        encoder_output = self.encoder(encoder_input)
-        state_h = self.state_h_transform(encoder_output)
-        state_c = self.state_c_transform(encoder_output)
-        decoder_buffer = tf.zeros(
-            (tf.shape(encoder_output)[0], 1, self.model_config.dim_out)
+    @tf.function
+    def call(self, inputs):
+        x = self.embedding(inputs)
+        batch_size = tf.shape(inputs)[0]
+        state_h = tf.zeros((batch_size, self.rnn.units))
+        state_c = tf.zeros((batch_size, self.rnn.units))
+        initial_states_outputs = (
+            (state_h, state_c),
+            tf.zeros((batch_size, 1)),
         )
 
-        initial_states = (decoder_buffer, state_h, state_c)
-
-        def step_fn(previous_states, _):
-            decoder_buffer, state_h, state_c = previous_states
-            lstm_out, state_h, state_c = self.decoder_lstm(  # type: ignore
-                decoder_buffer, initial_state=[state_h, state_c]
+        def step_fn(states_outputs, _):
+            (state_h, state_c), _ = states_outputs
+            context_vector, _ = self.attention(state_h, x)
+            _, state_h, state_c = self.rnn(
+                tf.expand_dims(context_vector, 1),
+                initial_state=[state_h, state_c],
             )
-            decoder_buffer = self.decoder_dense(lstm_out)
-            return (decoder_buffer, state_h, state_c)
+            output = self.output_layer(state_h)
+            return ((state_h, state_c), output)
 
-        all_outputs = tf.scan(
-            fn=step_fn,
+        _, outputs = tf.scan(
+            step_fn,
             elems=tf.range(self.model_config.seq_len),
-            initializer=initial_states,
-        )[0]
-
-        return tf.reshape(
-            all_outputs,
-            [-1, self.model_config.seq_len, self.model_config.dim_out],
+            initializer=initial_states_outputs,
         )
+
+        return tf.squeeze(outputs, axis=2)
+
+
+class BahdanauAttention(Layer):
+    def __init__(self, units: int):
+        super(BahdanauAttention, self).__init__()
+        self.W1 = Dense(units)
+        self.W2 = Dense(units)
+        self.V = Dense(1)
+
+    @tf.function
+    def call(self, query: tf.Tensor, values: tf.Tensor):
+        # Expand dimension of query to (batch_size, 1, hidden_size)
+        query_with_time_axis = tf.expand_dims(query, 1)
+
+        # Calculate the attention scores
+        score = self.V(
+            tf.nn.tanh(self.W1(query_with_time_axis) + self.W2(values))  # type: ignore
+        )
+
+        # Calculate attention weights
+        attention_weights = tf.nn.softmax(score, axis=1)
+
+        # Calculate the context vector
+        context_vector = attention_weights * values
+        context_vector = tf.reduce_sum(context_vector, axis=1)
+
+        return context_vector, attention_weights
 
 
 # import tensorflow as tf
