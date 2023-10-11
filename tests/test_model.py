@@ -136,8 +136,8 @@ class TestANN(unittest.TestCase):
 class TestLSTM(unittest.TestCase):
     def setUp(self) -> None:
         self.epoch = 1000
+        self.patience = 100
         self.print_per_epoch = 1
-        self.patience = self.epoch // 10
         self.model_class = EmbeddingAttentionLSTMRegressor
         self.input_params = LSTMInputParams
         self.output_params = LSTMOutputParams
@@ -208,17 +208,6 @@ class TestLSTM(unittest.TestCase):
             num_hyper_params -= 1
             json.dumps(phist["train_output"], indent=4)
             self.test_inference(fstem + ".keras")
-        #     print(f"{fstem} prediction: {y_pred}, true: {y_test}")
-        #     strength_pred = float(y_pred[0][0])
-        #     strength_true = float(y_test[0][0])
-        #     self.assertAlmostEqual(
-        #         strength_pred, strength_true, delta=strength_true * 0.5
-        #     )
-        #     dimension_pred = float(y_pred[0][1])
-        #     dimension_true = float(y_test[0][1])
-        #     self.assertAlmostEqual(
-        #         dimension_pred, dimension_true, delta=dimension_true * 1.0
-        #     )
         self.assertEqual(num_hyper_params, 0)
 
     def test_inference(
@@ -231,27 +220,18 @@ class TestLSTM(unittest.TestCase):
             y_pred.shape == y_test.shape
         ), f"{y_pred.shape} != {y_test.shape}"
         seq_len = y_pred.shape[1]
-        y_pred_low, y_pred_mid, y_pred_high = (
-            y_pred[0, seq_len // 4, 0],  # type: ignore
-            y_pred[0, seq_len // 2, 0],  # type: ignore
-            y_pred[0, seq_len * 3 // 4, 0],  # type: ignore
-        )
-        y_test_low, y_test_mid, y_test_high = (
-            y_test[0, seq_len // 4, 0],  # type: ignore
-            y_test[0, seq_len // 2, 0],  # type: ignore
-            y_test[0, seq_len * 3 // 4, 0],  # type: ignore
-        )
-        print(f"y_pred: {y_pred_low}, {y_pred_mid}, {y_pred_high}")
-        print(f"y_test: {y_test_low}, {y_test_mid}, {y_test_high}")
-        self.assertAlmostEqual(
-            y_pred_low, y_test_low, delta=y_test_low * 0.5
-        )
-        self.assertAlmostEqual(
-            y_pred_mid, y_test_mid, delta=y_test_mid * 0.5
-        )
-        self.assertAlmostEqual(
-            y_pred_high, y_test_high, delta=y_test_high * 0.5
-        )
+        n = 5
+
+        def extract_points(y: np.ndarray):
+            gap = seq_len // (n - 1)
+            last_idx = seq_len - 1
+            return tuple(y[0, min(i * gap, last_idx), 0] for i in range(n))
+
+        y_pred_points = extract_points(y_pred)[1:]
+        y_test_points = extract_points(y_test)[1:]
+        print(f"prediction: {y_pred_points}, true: {y_test_points}")
+        for yp, yt in zip(y_pred_points, y_test_points):
+            self.assertAlmostEqual(yp, yt, delta=yt * 0.5)
 
     @property
     def test_data(self) -> Tuple[np.ndarray, np.ndarray]:

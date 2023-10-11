@@ -60,32 +60,72 @@ class EmbeddingAttentionLSTMRegressor(tf.keras.Model):
 
     @tf.function
     def call(self, inputs):
-        x = self.embedding(inputs)
+        # inputs: [batch_size, n_features]
+        # outputs: [batch_size, seq_len, 1]
+
+        x = self.embedding(inputs)  # Now, x is [batch_size, embedding_dim]
         batch_size = tf.shape(inputs)[0]
         state_h = tf.zeros((batch_size, self.rnn.units))
         state_c = tf.zeros((batch_size, self.rnn.units))
+        initial_input = tf.zeros((batch_size, 1, tf.shape(x)[-1]))
         initial_states_outputs = (
-            (state_h, state_c),
+            (state_h, state_c, initial_input),
             tf.zeros((batch_size, 1)),
         )
 
         def step_fn(states_outputs, _):
-            (state_h, state_c), _ = states_outputs
-            context_vector, _ = self.attention(state_h, x)
-            _, state_h, state_c = self.rnn(
-                tf.expand_dims(context_vector, 1),
+            (state_h, state_c, current_input), _ = states_outputs
+            rnn_output, state_h, state_c = self.rnn(  # type: ignore
+                current_input,
                 initial_state=[state_h, state_c],
             )
-            output = self.output_layer(state_h)
-            return ((state_h, state_c), output)
+            return (
+                (state_h, state_c, rnn_output),
+                self.output_layer(state_h),
+            )
 
         _, outputs = tf.scan(
             step_fn,
             elems=tf.range(self.model_config.seq_len),
             initializer=initial_states_outputs,
         )
+        return tf.reshape(
+            outputs, (batch_size, self.model_config.seq_len, 1)
+        )
 
-        return tf.squeeze(outputs, axis=2)
+    # @tf.function
+    # def call(self, inputs):
+    #     # inputs: [batch_size, n_features]
+    #     # outputs: [batch_size, seq_len, 1]
+    #     x = self.embedding(inputs)  # Now, x is [batch_size, embedding_dim]
+    #     batch_size = tf.shape(inputs)[0]
+    #     state_h = tf.random.normal((batch_size, self.rnn.units), stddev=0.01)
+    #     state_c = tf.random.normal((batch_size, self.rnn.units), stddev=0.01)
+    #     initial_states_outputs = (
+    #         (state_h, state_c),
+    #         tf.zeros((batch_size, 1)),
+    #     )
+
+    #     def step_fn(states_outputs, _):
+    #         (state_h, state_c), _ = states_outputs
+    #         # Attention:
+    #         # - input: [batch_size, embedding_dim], [batch_size, seq_len, embedding_dim]
+    #         # - output: [batch_size, embedding_dim], [batch_size, seq_len, 1]
+    #         context_vector, _ = self.attention(state_h, x)  # type: ignore
+    #         _, state_h, state_c = self.rnn(  # type: ignore
+    #             tf.expand_dims(context_vector, 2),
+    #             initial_state=[state_h, state_c],
+    #         )
+    #         return ((state_h, state_c), self.output_layer(state_h))
+
+    #     _, outputs = tf.scan(
+    #         step_fn,
+    #         elems=tf.range(self.model_config.seq_len),
+    #         initializer=initial_states_outputs,
+    #     )
+    #     return tf.reshape(
+    #         outputs, (batch_size, self.model_config.seq_len, 1)
+    #     )
 
 
 class BahdanauAttention(Layer):
