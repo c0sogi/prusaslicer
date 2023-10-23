@@ -1,9 +1,10 @@
 # flake8: noqa
+import argparse
 from functools import reduce
 import json
 import multiprocessing
 import random
-from typing import Iterable, List, Tuple
+from typing import Tuple
 import unittest
 from uuid import uuid4
 import numpy as np
@@ -11,54 +12,80 @@ import numpy as np
 import pandas as pd
 
 from nn.ann import ANN
-from nn.config import ANNModelConfig, LSTMModelConfig
+from nn.config import ANNModelConfig
 from nn.dataloader import DataLoader
 from nn.inference import inference
-from nn.lstm import EmbeddingAttentionLSTMRegressor
 from nn.schemas import (
     ANNInputParams,
     ANNOutputParams,
-    LSTMInputParams,
-    LSTMOutputParams,
-    normalize_1d_sequence,
     read_all,
 )
 from nn.train import Trainer
 from nn.utils.logger import ApiLogger
 
 logger = ApiLogger(__name__)
+parser = argparse.ArgumentParser(description="CLI arguments for the script")
+parser.add_argument('--epochs', type=int, default=10000, help="Number of epochs for training")
+parser.add_argument('--batch_size', type=int, default=1000, help="Batch size for training")
+parser.add_argument('--output_path', type=str, default=f".tmp/{uuid4().hex}", help="Path to save the model")
+parser.add_argument('--use_multiprocessing', type=bool, default=False, help="Whether to use multiprocessing")
 
+args = parser.parse_args()
+
+# ========== 학습 파라미터 ========== #
+EPOCHS = args.epochs  # 학습 횟수
+BATCH_SIZE = args.batch_size  # 배치 사이즈
+OUTPUT_PATH = args.output_path  # 모델 저장 경로
+PATIENCE = EPOCHS // 10  # 조기 종료 기준
+PRINT_PER_EPOCH = EPOCHS // 100  # 학습 횟수 당 로그 출력 횟수
+USE_MULTIPROCESSING = args.use_multiprocessing  # 멀티프로세싱 사용 여부 (True 사용시 CPU 사용률 100%)
+ANNInputParams = [  # ANN 모델의 입력 파라미터
+    "bedtemp",
+    "exttemp",
+    "layerthickness",
+    "infillspeed",
+    "density",
+    "thermalresistance",
+    "impactstrength",
+    "glasstransitiontemp",
+    "thermalconductivity",
+    "linearthermalexpansioncoefficient",
+]
+ANNOutputParams = [
+    "strength",
+    "lengthavg",
+    "weight",
+]
+GRID_SEARCH_HYPER_PARAMS = {
+        "lr": (0.001, 0.005, 0.01),
+        "n1": (20, 30, 40),
+        "n2": (10, 20, 30),
+        "n3": (5, 10, 15, 20),
+    }
+# ================================== #
 
 class TestANN(unittest.TestCase):
     def setUp(self) -> None:
-        self.epoch = 10000
-        self.print_per_epoch = self.epoch // 100
-        self.patience = self.epoch // 10
         self.model_class = ANN
         self.input_params = ANNInputParams
         self.output_params = ANNOutputParams
         self.model_config = ANNModelConfig(
-            output_path=f".tmp/{uuid4().hex}",
+            output_path=OUTPUT_PATH,
             metrics=["mse", "mae", "mape"],
             kfold_splits=0,
-            print_per_epoch=self.print_per_epoch,
-            batch_size=1,
-            epochs=self.epoch,
-            patience=self.patience,
-            loss_funcs=["mape", "mae"],
-            loss_weights=[0.5, 0.5],
+            print_per_epoch=PRINT_PER_EPOCH,
+            batch_size=BATCH_SIZE,
+            epochs=EPOCHS,
+            patience=PATIENCE,
+            loss_funcs=["mape" if output_param == "lengthavg" else "mae" for output_param in ANNOutputParams],
+            loss_weights=[0.5 for _ in range(len(ANNOutputParams))],
             l1_reg=None,
             l2_reg=None,
             dropout_rate=0.0,
             normalize_layer=False,
-            dim_out=2,
+            dim_out=len(ANNOutputParams),
         )
-        self.all_hyper_params = {
-            "lr": (0.001,),
-            "n1": (10,),
-            "n2": (10,),
-            "n3": (10,),
-        }
+        self.all_hyper_params = GRID_SEARCH_HYPER_PARAMS
         dataset = read_all(dropna=True)
         train_inputs = dataset[self.input_params].astype(float)
         train_outputs = dataset[self.output_params].astype(float)
@@ -81,7 +108,7 @@ class TestANN(unittest.TestCase):
             model_name=self.model_class.__name__,
             model_config=self.model_config,
             workers=multiprocessing.cpu_count(),
-            use_multiprocessing=True,
+            use_multiprocessing=USE_MULTIPROCESSING,
         )
         print(self.train_inputs)
         print(self.train_outputs)
@@ -132,3 +159,9 @@ class TestANN(unittest.TestCase):
         )
         return x_test.to_numpy(), y_test.to_numpy()
 
+
+if __name__ == "__main__":
+    # test_train_and_inference 수행
+    suite = unittest.TestSuite()
+    suite.addTest(TestANN('test_train_and_inference'))
+    unittest.TextTestRunner().run(suite)

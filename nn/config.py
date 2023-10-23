@@ -84,7 +84,7 @@ class ANNModelConfig(BaseModelConfig):
 @dataclass
 class LSTMModelConfig(BaseModelConfig):
     seq_len: int = 512
-    ann_model_path: str = ""
+    ann_model_path: Optional[str] = None
     state_transform_activation: str = "tanh"
 
     def __post_init__(self) -> None:
