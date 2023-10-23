@@ -1,14 +1,14 @@
 # flake8: noqa
 
 # STL 파일 이름
-STL_FILENAME: str = "specimen5.stl"
+STL_FILENAME: str = "specimen3.stl"
 # 필라멘트 옵션
-FAN_SPEEDS = (0,)  # (FS) 출력 도중 팬의 작동량, ABS는 0%, PLA는 100%
-BED_TEMPERATURES = (60, 80, 100)  # (BT) 베드의 온도
+FAN_SPEEDS = (100,)  # (FS) 출력 도중 팬의 작동량, ABS는 0%, PLA는 100%
+BED_TEMPERATURES = (60, 70, 80)  # (BT) 베드의 온도
 EXTRUDER_TEMPERATURES = (
+    230,
+    240,
     250,
-    255,
-    260,
 )  # (ET) 압출기의 온도, PLA의 경우 (200, 240), ABS의 경우 (245, 255)
 # infill_overlaps = ("15%", "35%")  # (IO) 보류!
 
@@ -38,6 +38,7 @@ M140 S[first_layer_bed_temperature]	; start bed heating
 G28 X0 Y0 Z0	; move X/Y/Z to endstops
 G1 X1 Y6 F15000	; move X/Y to start position
 G1 Z35 F9000	; move Z to start position
+
 
 ; Wait for bed and nozzle temperatures
 M190 S{first_layer_bed_temperature[0] - 5}	; wait for bed temperature - 5

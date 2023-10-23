@@ -16,9 +16,7 @@ class BaseModelConfig:
     seed: int = 777
     print_per_epoch: int = 100
     output_path: str = "./output"
-    metrics: List[str] = field(
-        default_factory=lambda: ["mse", "mae", "mape"]
-    )
+    metrics: List[str] = field(default_factory=lambda: ["mse", "mae", "mape"])
     epochs: int = 2000
     batch_size: int = 100
     kfold_splits: int = 6
@@ -28,9 +26,7 @@ class BaseModelConfig:
 
     # 하이퍼파라미터
     lr: float = 0.001
-    loss_funcs: LossFuncsString = field(
-        default_factory=lambda: ["mae", "mae"]
-    )
+    loss_funcs: LossFuncsString = field(default_factory=lambda: ["mae", "mae"])
     loss_weights: List[float] = field(default_factory=lambda: [0.5, 0.5])
     activation: str = "relu"
 
@@ -44,9 +40,7 @@ class BaseModelConfig:
         try:
             activations.get(self.activation)
         except Exception as e:
-            raise ValueError(
-                f"{self.activation}은 잘못된 Activation Function입니다: {e}"
-            )
+            raise ValueError(f"{self.activation}은 잘못된 Activation Function입니다: {e}")
 
         assert self.dim_out > 0, "출력층 뉴런 수는 0보다 커야 합니다."
         assert self.epochs > 0, "학습 Epoch 수는 0보다 커야 합니다."
@@ -54,9 +48,7 @@ class BaseModelConfig:
         assert self.kfold_splits >= 0, "K-Fold Splits는 0보다 크거나 같아야 합니다."
         assert self.patience > 0, "Patience는 0보다 커야 합니다."
         if isinstance(self.loss_funcs, str):
-            assert self.loss_funcs in get_args(
-                LossKeys
-            ), "잘못된 Loss Function입니다."
+            assert self.loss_funcs in get_args(LossKeys), "잘못된 Loss Function입니다."
         else:
             assert all(
                 lf in get_args(LossKeys) for lf in self.loss_funcs
@@ -98,9 +90,8 @@ class LSTMModelConfig(BaseModelConfig):
     def __post_init__(self) -> None:
         super().__post_init__()
         assert self.seq_len > 0, "Sequence Length는 0보다 커야 합니다."
-        assert (
-            self.ann_model_path and Path(self.ann_model_path).exists()
-        ), "ANN 모델이 존재하지 않습니다."
+        if self.ann_model_path:
+            assert Path(self.ann_model_path).exists(), "ANN 모델이 존재하지 않습니다."
 
 
 # @dataclass

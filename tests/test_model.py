@@ -42,7 +42,7 @@ class TestANN(unittest.TestCase):
             metrics=["mse", "mae", "mape"],
             kfold_splits=0,
             print_per_epoch=self.print_per_epoch,
-            batch_size=100,
+            batch_size=1,
             epochs=self.epoch,
             patience=self.patience,
             loss_funcs=["mape", "mae"],
@@ -135,7 +135,7 @@ class TestANN(unittest.TestCase):
 
 class TestLSTM(unittest.TestCase):
     def setUp(self) -> None:
-        self.epoch = 1000
+        self.epoch = 100
         self.patience = 100
         self.print_per_epoch = 1
         self.model_class = EmbeddingAttentionLSTMRegressor

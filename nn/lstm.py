@@ -1,20 +1,16 @@
 # flake8: noqa
 from dataclasses import asdict
-from datetime import datetime
-from typing import Dict, List, Tuple, Union
 
 import tensorflow as tf
 from keras import Model
-from keras.layers import LSTM, Dense, TimeDistributed, Layer
+from keras.layers import LSTM, Dense, Layer
 from keras.models import load_model
 from keras.optimizers import Adam
-from keras.src.engine import data_adapter
 
 from .config import LSTMModelConfig
-from .losses import weighted_loss
 
 
-class EmbeddingAttentionLSTMRegressor(tf.keras.Model):
+class EmbeddingAttentionLSTMRegressor(Model):
     def get_config(self):
         config = super().get_config()
         config.update({"model_config": asdict(self.model_config)})
@@ -32,24 +28,32 @@ class EmbeddingAttentionLSTMRegressor(tf.keras.Model):
     def __init__(self, model_config: LSTMModelConfig, **kwargs):
         super().__init__()
         self.optimizer = Adam(learning_rate=model_config.lr)
-        ann = load_model(model_config.ann_model_path)
-        assert isinstance(ann, Model), type(ann)
-        ann.trainable = False
-        for layer in ann.layers:
-            layer.trainable = False
+        if model_config.ann_model_path:
+            ann = load_model(model_config.ann_model_path)
+            assert isinstance(ann, Model), type(ann)
+            ann.trainable = False
+            for layer in ann.layers:
+                layer.trainable = False
 
-        # Propagate this input through ann
-        input_tensor = ann.layers[0].output
-        x = input_tensor
-        # start from the layer after the InputLayer and skip the last layer
-        for layer in ann.layers[1:-1]:
-            x = layer(x)
-        self.embedding = Model(inputs=input_tensor, outputs=x)
-        self.embedding.trainable = False
-        self.rnn = LSTM(
-            ann.model_config.n2, return_sequences=True, return_state=True
+            # Propagate this input through ann
+            input_tensor = ann.layers[0].output
+            x = input_tensor
+            # start from the layer after the InputLayer and skip the last layer
+            for layer in ann.layers[1:-1]:
+                x = layer(x)
+            self.feature_extractor = Model(inputs=input_tensor, outputs=x)
+            self.feature_extractor.trainable = False
+            lstm_units = ann.model_config.n2
+        else:
+            self.feature_extractor = Dense(model_config.dim_in)
+            lstm_units = model_config.dim_in
+        self.encoder_lstm = LSTM(
+            lstm_units, return_sequences=True, return_state=True
         )
-        self.attention = BahdanauAttention(self.rnn.units)
+        self.decoder_lstm = LSTM(
+    lstm_units, return_sequences=True, return_state=True
+        )
+        self.attention = BahdanauAttention(self.decoder_lstm.units)
         self.output_layer = Dense(1)
         self.model_config = model_config
         self.compile(
@@ -60,68 +64,137 @@ class EmbeddingAttentionLSTMRegressor(tf.keras.Model):
 
     @tf.function
     def call(self, inputs):
-        # inputs: [batch_size, n_features]
-        # outputs: [batch_size, seq_len, 1]
-
-        x = self.embedding(inputs)  # Now, x is [batch_size, embedding_dim]
+        """Attention mechanism with LSTM"""
         batch_size = tf.shape(inputs)[0]
-        state_h = tf.zeros((batch_size, self.rnn.units))
-        state_c = tf.zeros((batch_size, self.rnn.units))
-        initial_input = tf.zeros((batch_size, 1, tf.shape(x)[-1]))
-        initial_states_outputs = (
-            (state_h, state_c, initial_input),
-            tf.zeros((batch_size, 1)),
+
+        # 1. Encoder
+        encoder_outputs = tf.tile(
+            tf.expand_dims(self.feature_extractor(inputs), 1),
+            [1, self.model_config.seq_len, 1],
+        )  # [batch_size, seq_len, embedding_size]
+        _, initial_state_h, initial_state_c = self.encoder_lstm(
+            encoder_outputs
         )
 
-        def step_fn(states_outputs, _):
-            (state_h, state_c, current_input), _ = states_outputs
-            rnn_output, state_h, state_c = self.rnn(  # type: ignore
-                current_input,
-                initial_state=[state_h, state_c],
-            )
-            return (
-                (state_h, state_c, rnn_output),
-                self.output_layer(state_h),
-            )
+        # 2. Decoder with Attention
+        decoder_input = tf.zeros(
+            (batch_size, 1, tf.shape(encoder_outputs)[-1])
+        )  # [batch_size, 1, embedding_size]
 
-        _, outputs = tf.scan(
+        def step_fn(states, _):
+            decoder_state_h, decoder_state_c, decoder_input = states
+
+            # # Attention mechanism
+            # context_vector, _ = self.attention(
+            #     decoder_state_h, encoder_outputs
+            # )
+            # # Reshape context_vector from [batch_size, embedding_size] to [batch_size, 1, embedding_size]
+            # # Then, combine context vector with current decoder input
+            # combined_input = tf.concat(
+            #     [tf.expand_dims(context_vector, 1), decoder_input], axis=-1
+            # )  # [batch_size, 1, embedding_size * 2]
+
+            # Decoder LSTM
+            (
+                decoder_output,
+                decoder_state_h,
+                decoder_state_c,
+            ) = self.decoder_lstm(
+                decoder_input,
+                initial_state=[decoder_state_h, decoder_state_c],
+            )
+            return (decoder_state_h, decoder_state_c, decoder_output)
+
+        # Using tf.scan for the decoder
+        _, _, outputs = tf.scan(
             step_fn,
             elems=tf.range(self.model_config.seq_len),
-            initializer=initial_states_outputs,
-        )
-        return tf.reshape(
-            outputs, (batch_size, self.model_config.seq_len, 1)
+            initializer=(initial_state_h, initial_state_c, decoder_input),
+        )  # [seq_len, batch_size, 1, hidden_dim]
+        # 3. Return the sequence of decoder outputs
+        return self.output_layer(
+            tf.transpose(tf.squeeze(outputs, 2), [1, 0, 2])
         )
 
     # @tf.function
     # def call(self, inputs):
+    #     """Attention mechanism with LSTM"""
     #     # inputs: [batch_size, n_features]
-    #     # outputs: [batch_size, seq_len, 1]
-    #     x = self.embedding(inputs)  # Now, x is [batch_size, embedding_dim]
     #     batch_size = tf.shape(inputs)[0]
-    #     state_h = tf.random.normal((batch_size, self.rnn.units), stddev=0.01)
-    #     state_c = tf.random.normal((batch_size, self.rnn.units), stddev=0.01)
-    #     initial_states_outputs = (
-    #         (state_h, state_c),
-    #         tf.zeros((batch_size, 1)),
-    #     )
 
+    #     # Embed inputs as a query vector
+    #     # q: [batch_size, embedding_dim]
+    #     q = self.embedding(inputs)
+
+    #     # Define step function
     #     def step_fn(states_outputs, _):
-    #         (state_h, state_c), _ = states_outputs
-    #         # Attention:
-    #         # - input: [batch_size, embedding_dim], [batch_size, seq_len, embedding_dim]
-    #         # - output: [batch_size, embedding_dim], [batch_size, seq_len, 1]
-    #         context_vector, _ = self.attention(state_h, x)  # type: ignore
-    #         _, state_h, state_c = self.rnn(  # type: ignore
-    #             tf.expand_dims(context_vector, 2),
+    #         (state_h, state_c, current_step), _ = states_outputs
+
+    #         # Use attention mechanism
+    #         context_vector, _ = self.attention(q, current_step)  # type: ignore
+
+    #         # # Combine context vector with current input
+    #         # combined_input = tf.concat(
+    #         #     [tf.expand_dims(context_vector, 1), current_step], axis=-1
+    #         # )
+
+    #         # Pass combined input to the RNN
+    #         rnn_output, state_h, state_c = self.decoder_lstm(  # type: ignore
+    #             tf.expand_dims(context_vector, 1),
     #             initial_state=[state_h, state_c],
     #         )
-    #         return ((state_h, state_c), self.output_layer(state_h))
+    #         return (
+    #             (state_h, state_c, rnn_output),
+    #             self.output_layer(state_h),
+    #         )
+
+    #     # Initialize hidden & cell states and the first step of sequence
+    #     state_h0 = tf.zeros((batch_size, self.decoder_lstm.units))
+    #     state_c0 = tf.zeros((batch_size, self.decoder_lstm.units))
+    #     first_step = tf.zeros((batch_size, 1, tf.shape(q)[-1]))
+    #     _, outputs = tf.scan(
+    #         step_fn,
+    #         elems=tf.range(self.model_config.seq_len),
+    #         initializer=(
+    #             (state_h0, state_c0, first_step),
+    #             tf.zeros((batch_size, 1)),
+    #         ),
+    #     )
+    #     # return: [batch_size, seq_len, 1]
+    #     return tf.reshape(
+    #         outputs, (batch_size, self.model_config.seq_len, 1)
+    #     )
+
+    # @tf.function
+    # def call(self, inputs):
+    #     """No attention mechanism with LSTM"""
+    #     # inputs: [batch_size, n_features]
+    #     # outputs: [batch_size, seq_len, 1]
+    #     batch_size = tf.shape(inputs)[0]
+
+    #     # Initialize states and inputs
+    #     state_c = state_h = self.embedding(
+    #         inputs
+    #     )  # [batch_size, embedding_dim]
+    #     initial_input = tf.zeros((batch_size, 1, tf.shape(state_c)[-1]))
+
+    #     def step_fn(states_outputs, _):
+    #         (state_h, state_c, current_input), _ = states_outputs
+    #         rnn_output, state_h, state_c = self.decoder_lstm(  # type: ignore
+    #             current_input, initial_state=[state_h, state_c]
+    #         )
+    #         return (
+    #             (state_h, state_c, rnn_output),
+    #             self.output_layer(state_h),
+    #         )
 
     #     _, outputs = tf.scan(
     #         step_fn,
     #         elems=tf.range(self.model_config.seq_len),
-    #         initializer=initial_states_outputs,
+    #         initializer=(
+    #             (state_h, state_c, initial_input),
+    #             tf.zeros((batch_size, 1)),
+    #         ),
     #     )
     #     return tf.reshape(
     #         outputs, (batch_size, self.model_config.seq_len, 1)
@@ -130,7 +203,7 @@ class EmbeddingAttentionLSTMRegressor(tf.keras.Model):
 
 class BahdanauAttention(Layer):
     def __init__(self, units: int):
-        super(BahdanauAttention, self).__init__()
+        super().__init__()
         self.W1 = Dense(units)
         self.W2 = Dense(units)
         self.V = Dense(1)
