@@ -93,6 +93,9 @@ class DataLoader:
                 f"===== Train outputs: {self.train_outputs.shape} ====="
             )
             logger.debug(self.train_outputs.head(3))
+            logger.debug(
+                f"shape: {self.train_inputs.shape} == {self.train_outputs.shape}"  # noqa: E501
+            )
 
     def dataset_batch_iterator(
         self, batch_size: int = 1

@@ -1,0 +1,1 @@
+python -m training_ann --mode 2
