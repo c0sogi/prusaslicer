@@ -25,10 +25,24 @@ from nn.utils.logger import ApiLogger
 
 logger = ApiLogger(__name__)
 parser = argparse.ArgumentParser(description="CLI arguments for the script")
-parser.add_argument('--epochs', type=int, default=10000, help="Number of epochs for training")
-parser.add_argument('--batch_size', type=int, default=1000, help="Batch size for training")
-parser.add_argument('--output_path', type=str, default=f".tmp/{uuid4().hex}", help="Path to save the model")
-parser.add_argument('--use_multiprocessing', type=bool, default=False, help="Whether to use multiprocessing")
+parser.add_argument(
+    "--epochs", type=int, default=10000, help="Number of epochs for training"
+)
+parser.add_argument(
+    "--batch_size", type=int, default=1000, help="Batch size for training"
+)
+parser.add_argument(
+    "--output_path",
+    type=str,
+    default=f".tmp/{uuid4().hex}",
+    help="Path to save the model",
+)
+parser.add_argument(
+    "--use_multiprocessing",
+    type=bool,
+    default=False,
+    help="Whether to use multiprocessing",
+)
 
 args = parser.parse_args()
 
@@ -38,12 +52,13 @@ BATCH_SIZE = args.batch_size  # 배치 사이즈
 OUTPUT_PATH = args.output_path  # 모델 저장 경로
 PATIENCE = EPOCHS // 10  # 조기 종료 기준
 PRINT_PER_EPOCH = EPOCHS // 100  # 학습 횟수 당 로그 출력 횟수
-USE_MULTIPROCESSING = args.use_multiprocessing  # 멀티프로세싱 사용 여부 (True 사용시 CPU 사용률 100%)
+USE_MULTIPROCESSING = (
+    args.use_multiprocessing
+)  # 멀티프로세싱 사용 여부 (True 사용시 CPU 사용률 100%)
 ANNInputParams = [  # ANN 모델의 입력 파라미터
     "bedtemp",
     "exttemp",
     "layerthickness",
-    "infillspeed",
     "density",
     "thermalresistance",
     "impactstrength",
@@ -55,14 +70,16 @@ ANNOutputParams = [
     "strength",
     "lengthavg",
     "weight",
+    "elongation",
 ]
 GRID_SEARCH_HYPER_PARAMS = {
-        "lr": (0.001, 0.005, 0.01),
-        "n1": (20, 30, 40),
-        "n2": (10, 20, 30),
-        "n3": (5, 10, 15, 20),
-    }
+    "lr": (0.001, 0.005, 0.01),
+    "n1": (20, 30, 40),
+    "n2": (10, 20, 30),
+    "n3": (5, 10, 15, 20),
+}
 # ================================== #
+
 
 class TestANN(unittest.TestCase):
     def setUp(self) -> None:
@@ -77,7 +94,10 @@ class TestANN(unittest.TestCase):
             batch_size=BATCH_SIZE,
             epochs=EPOCHS,
             patience=PATIENCE,
-            loss_funcs=["mape" if output_param == "lengthavg" else "mae" for output_param in ANNOutputParams],
+            loss_funcs=[
+                "mape" if output_param == "lengthavg" else "mae"
+                for output_param in ANNOutputParams
+            ],
             loss_weights=[0.5 for _ in range(len(ANNOutputParams))],
             l1_reg=None,
             l2_reg=None,
@@ -163,5 +183,5 @@ class TestANN(unittest.TestCase):
 if __name__ == "__main__":
     # test_train_and_inference 수행
     suite = unittest.TestSuite()
-    suite.addTest(TestANN('test_train_and_inference'))
+    suite.addTest(TestANN("test_train_and_inference"))
     unittest.TextTestRunner().run(suite)

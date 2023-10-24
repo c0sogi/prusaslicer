@@ -42,6 +42,7 @@ class Trainer:
     model_name: Optional[str] = None
     workers: int = multiprocessing.cpu_count()
     use_multiprocessing: bool = True
+    validation_split: float = 0.1
 
     def __post_init__(self) -> None:
         self._model_name = self.model_name or str(self.model_class.__name__)
@@ -100,7 +101,6 @@ class Trainer:
         validation_data: Optional[Tuple[DataLike, DataLike]] = None,
         hyper_params: Optional[HyperParamsDict] = None,
         kfold_case: Optional[int] = None,
-        val_split: Optional[float] = 0.1,
     ) -> Tuple[str, PickleHistory]:
         model_config = self.apply_hyper_params(hyper_params)
         tf.random.set_seed(model_config.seed)
@@ -121,6 +121,7 @@ class Trainer:
 
         logger.info(f"Start training: {model_config}")
         if validation_data is None:
+            val_split = self.validation_split
             if isinstance(x_train, (list, tuple)):
                 random_state_val = np.random.randint(0, int(1e5))
                 splits = [

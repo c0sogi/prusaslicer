@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from re import findall
 from typing import Dict, List, Tuple
 
 import numpy as np
@@ -84,14 +85,13 @@ def _read_ss_curves(
     ss_data_dict: Dict[str, SSCurve] = {}
     for csv_dir_path in Path(raw_data_path).iterdir():
         for csv_file_path in csv_dir_path.glob("*.csv"):
-            seperated: List[str] = csv_file_path.stem.split("_")
-            try:
-                key = f"{csv_dir_path.name.upper()}-{int(seperated[0])}-{int(seperated[1])}"  # noqa: E501
-                assert len(seperated) == 2, f"{csv_file_path} is not valid"
-            except Exception as e:
-                logger.error(f"{csv_file_path} is not valid: {e}")
+            numbers = findall(r"(\d+)\.(\d+)", csv_file_path.stem)
+            if numbers:
+                before_dot, after_dot = numbers[0]
+                key = f"{csv_dir_path.name.upper()}-{before_dot}-{after_dot}"
+            else:
+                logger.error(f"{csv_file_path} is not valid")
                 continue
-
             df = _read_single_ss_curve(csv_file_path)
             try:
                 strain = df["변형율"].tolist()
