@@ -32,6 +32,9 @@ parser.add_argument(
     "--epochs", type=int, default=10000, help="Number of epochs for training"
 )
 parser.add_argument(
+    "--patience", type=int, default=1000, help="Number of early stopping epochs for training"
+)
+parser.add_argument(
     "--batch_size", type=int, default=1000, help="Batch size for training"
 )
 parser.add_argument(
@@ -42,8 +45,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--use_multiprocessing",
-    type=bool,
-    default=False,
+    action="store_true",
     help="Whether to use multiprocessing",
 )
 parser.add_argument(
@@ -101,9 +103,9 @@ ALL_HYPER_PARAMS = {
     "n3": args.n3,
 }
 OUTPUT_PATH = (
-    args.output_path if args.output_path else f"./output/{uuid4().hex}"
+    args.output_path if args.output_path else f"./output/MODE{MODE}"
 )  # 모델 저장 경로
-PATIENCE = EPOCHS // 10  # 조기 종료 기준
+PATIENCE = args.patience  # 조기 종료 기준
 PRINT_PER_EPOCH = EPOCHS // 100  # 학습 횟수 당 로그 출력 횟수
 USE_MULTIPROCESSING = (
     args.use_multiprocessing
