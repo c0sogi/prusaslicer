@@ -43,6 +43,7 @@ class Trainer:
     workers: int = multiprocessing.cpu_count()
     use_multiprocessing: bool = True
     validation_split: float = 0.1
+    validation_data_loader: Optional[DataLoader] = None
 
     def __post_init__(self) -> None:
         self._model_name = self.model_name or str(self.model_class.__name__)
@@ -120,7 +121,7 @@ class Trainer:
             )
 
         logger.info(f"Start training: {model_config}")
-        if validation_data is None:
+        if validation_data is None and self.validation_data_loader is None:
             val_split = self.validation_split
             if isinstance(x_train, (list, tuple)):
                 random_state_val = np.random.randint(0, int(1e5))
@@ -142,6 +143,15 @@ class Trainer:
                     x_train, y_train, test_size=val_split
                 )
             validation_data = (x_val, y_val)
+        elif (
+            validation_data is None
+            and self.validation_data_loader is not None
+        ):
+            validation_data = (
+                self.validation_data_loader.train_inputs,
+                self.validation_data_loader.train_outputs,
+            )
+
         hist = model.fit(
             x_train,
             y_train,

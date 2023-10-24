@@ -157,3 +157,16 @@ def read_all(
 
     logger.debug(f"===== Number of valid data: {ss_curves.shape[0]} =====")
     return group_ss_curves(ss_curves)
+
+
+def read_all_no_ss(
+    raw_data_dir: os.PathLike = Path("./raw_data"),
+    table_filename: str = "petg_table.csv",
+) -> pd.DataFrame:
+    # Load raw data (ss curves and table)
+    x_data, y_data = _read_x_and_y_from_table(
+        Path(raw_data_dir) / table_filename
+    )
+    all_data = pd.concat([x_data, y_data], axis=1)
+    logger.debug(f"===== Number of valid data: {all_data.shape[0]} =====")
+    return all_data

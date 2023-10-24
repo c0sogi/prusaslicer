@@ -106,7 +106,7 @@ class DataLoader:
             else:
                 dataset_sizes.append(len(data))
 
-        dataset_size = int(min(dataset_sizes))
+        dataset_size = int(min(dataset_sizes))  # type: ignore[no-untyped-call]
         for batch_start in range(0, dataset_size, batch_size):
             batch_end = min(dataset_size, batch_start + batch_size)
             if isinstance(xs, (list, tuple)):

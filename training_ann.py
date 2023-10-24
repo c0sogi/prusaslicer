@@ -19,6 +19,7 @@ from nn.schemas import (
     ANNInputParams,
     ANNOutputParams,
     read_all,
+    read_all_no_ss,
 )
 from nn.train import Trainer
 from nn.utils.logger import ApiLogger
@@ -80,10 +81,17 @@ parser.add_argument(
     default=[0.0, 0.3, 0.5],
     help="Values for dropout_rate. Example: --dropout_rate 0.0 0.3 0.5",
 )
+parser.add_argument(
+    "--mode",
+    type=int,
+    default=0,
+    help="Mode for training. 0: ABSPLA vs ABSPLA, 1: ABSPLA vs PETG, 2: ABSPLA+PETG vs PETG",
+)
 # ================================== #
 
 # ========== 건드리지 마세요 ========== #
 args = parser.parse_args()
+MODE = args.mode  # 학습 모드
 EPOCHS = args.epochs  # 학습 횟수
 BATCH_SIZE = args.batch_size  # 배치 사이즈
 ALL_HYPER_PARAMS = {
@@ -91,7 +99,6 @@ ALL_HYPER_PARAMS = {
     "n1": args.n1,
     "n2": args.n2,
     "n3": args.n3,
-    "dropout_rate": args.dropout_rate,
 }
 OUTPUT_PATH = (
     args.output_path if args.output_path else f"./output/{uuid4().hex}"
@@ -116,13 +123,135 @@ ANNOutputParams = [
     "strength",
     "lengthavg",
     "weight",
-    "elongation",
+    # "elongation",
 ]
+
+
 # ================================== #
+def ABSPLA_vs_ABSPLA(
+    model_config, input_params, output_params
+):
+    # 데이터셋 로드
+    dataset = read_all(table_filename="table.csv", dropna=True)
+
+    # 학습 X, Y 데이터셋 분리
+    train_inputs = dataset[input_params].astype(float)
+    train_inputs = train_inputs[~train_inputs.index.duplicated(keep="first")]
+    train_outputs = dataset[output_params].astype(float)
+    train_outputs = train_outputs[
+        ~train_outputs.index.duplicated(keep="first")
+    ]
+
+    # 데이터셋 로더 생성
+    data_loader = DataLoader(
+        model_config=model_config,
+        train_inputs=train_inputs,
+        train_outputs=train_outputs,
+        train_input_params=input_params,
+        train_output_params=output_params,
+    )
+    print(train_inputs.shape, train_outputs.shape)
+    return data_loader, None
+
+
+def ABSPLA_vs_PETG(
+    model_config, input_params, output_params
+):
+    # 데이터셋 로드
+    dataset = read_all(table_filename="table.csv", dropna=True)
+    petg_dataset = read_all_no_ss(table_filename="petg_table.csv")
+
+    # 학습 X, Y 데이터셋 분리
+    train_inputs = dataset[input_params].astype(float)
+    train_inputs = train_inputs[~train_inputs.index.duplicated(keep="first")]
+    train_outputs = dataset[output_params].astype(float)
+    train_outputs = train_outputs[
+        ~train_outputs.index.duplicated(keep="first")
+    ]
+
+    # 검증 데이터셋 분리
+    validation_inputs = petg_dataset[input_params].astype(float)
+    validation_inputs = validation_inputs[
+        ~validation_inputs.index.duplicated(keep="first")
+    ]
+    validation_outputs = petg_dataset[output_params].astype(float)
+    validation_outputs = validation_outputs[
+        ~validation_outputs.index.duplicated(keep="first")
+    ]
+
+    # 데이터셋 로더 생성
+    data_loader = DataLoader(
+        model_config=model_config,
+        train_inputs=train_inputs,
+        train_outputs=train_outputs,
+        train_input_params=input_params,
+        train_output_params=output_params,
+    )
+    validation_data_loader = DataLoader(
+        model_config=model_config,
+        train_inputs=validation_inputs,
+        train_outputs=validation_outputs,
+        train_input_params=input_params,
+        train_output_params=output_params,
+    )
+    print(train_inputs.shape, train_outputs.shape)
+    return data_loader, validation_data_loader
+
+
+def ABSPLApetg_vs_PETG(
+    model_config, input_params, output_params
+):
+    # 데이터셋 로드
+    dataset = read_all(table_filename="table.csv", dropna=True)
+    petg_dataset = read_all_no_ss(table_filename="petg_table.csv")
+
+    # 학습 X, Y 데이터셋 분리
+    train_inputs = dataset[input_params].astype(float)
+    train_inputs = train_inputs[~train_inputs.index.duplicated(keep="first")]
+    train_outputs = dataset[output_params].astype(float)
+    train_outputs = train_outputs[
+        ~train_outputs.index.duplicated(keep="first")
+    ]
+
+    # 검증 데이터셋 분리
+    validation_inputs = petg_dataset[input_params].astype(float)
+    validation_inputs = validation_inputs[
+        ~validation_inputs.index.duplicated(keep="first")
+    ]
+    validation_outputs = petg_dataset[output_params].astype(float)
+    validation_outputs = validation_outputs[
+        ~validation_outputs.index.duplicated(keep="first")
+    ]
+
+    # 데이터셋 로더 생성
+    data_loader = DataLoader(
+        model_config=model_config,
+        train_inputs=train_inputs,
+        train_outputs=train_outputs,
+        train_input_params=input_params,
+        train_output_params=output_params,
+    )
+    validation_data_loader = DataLoader(
+        model_config=model_config,
+        train_inputs=validation_inputs,
+        train_outputs=validation_outputs,
+        train_input_params=input_params,
+        train_output_params=output_params,
+    )
+    print(train_inputs.shape, train_outputs.shape)
+    return data_loader, validation_data_loader
 
 
 class TestANN(unittest.TestCase):
     def setUp(self) -> None:
+        if MODE == 0:
+            dataload_callback = ABSPLA_vs_ABSPLA
+        elif MODE == 1:
+            dataload_callback = ABSPLA_vs_PETG
+        elif MODE == 2:
+            dataload_callback = ABSPLApetg_vs_PETG
+        else:
+            raise ValueError("Invalid MODE")
         self.model_class = ANN
         self.input_params = ANNInputParams
         self.output_params = ANNOutputParams
@@ -146,33 +275,23 @@ class TestANN(unittest.TestCase):
             dim_out=len(ANNOutputParams),
         )
         logger.debug(f"all_hyper_params: {ALL_HYPER_PARAMS}")
-        dataset = read_all(dropna=True)
-        train_inputs = dataset[self.input_params].astype(float)
-        train_outputs = dataset[self.output_params].astype(float)
-        self.train_inputs = train_inputs[
-            ~train_inputs.index.duplicated(keep="first")
-        ]
-        self.train_outputs = train_outputs[
-            ~train_outputs.index.duplicated(keep="first")
-        ]
-        self.data_loader = DataLoader(
+        (
+            self.data_loader,
+            self.validation_data_loader,
+        ) = dataload_callback(
             model_config=self.model_config,
-            train_inputs=self.train_inputs,
-            train_outputs=self.train_outputs,
-            train_input_params=self.input_params,
-            train_output_params=self.output_params,
+            input_params=self.input_params,
+            output_params=self.output_params,
         )
         self.trainer = Trainer(
             data_loader=self.data_loader,
+            validation_data_loader=self.validation_data_loader,
             model_class=self.model_class,
             model_name=self.model_class.__name__,
             model_config=self.model_config,
             workers=multiprocessing.cpu_count(),
             use_multiprocessing=USE_MULTIPROCESSING,
         )
-        print(self.train_inputs)
-        print(self.train_outputs)
-        print(self.train_inputs.shape, self.train_outputs.shape)
 
     def test_train_and_inference(self):
         num_hyper_params = reduce(
