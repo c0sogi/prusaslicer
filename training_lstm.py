@@ -21,19 +21,40 @@ from nn.schemas import (
 )
 from nn.train import Trainer
 from nn.utils.logger import ApiLogger
-from 트레이닝_ANN import ANNInputParams
+from training_ann import ANNInputParams
 
 logger = ApiLogger(__name__)
-parser = argparse.ArgumentParser(description="CLI arguments for the script")
-parser.add_argument('--epochs', type=int, default=10000, help="Number of epochs for training")
-parser.add_argument('--batch_size', type=int, default=1000, help="Batch size for training")
-parser.add_argument('--output_path', type=str, default=f".tmp/{uuid4().hex}", help="Path to save the model")
-parser.add_argument('--seq_len', type=int, default=64, help="Sequence length for LSTM")
-parser.add_argument('--ann_model_path', type=str, default=None, help="Path to ANN model")
-parser.add_argument('--use_multiprocessing', type=bool, default=False, help="Whether to use multiprocessing")
-args = parser.parse_args()
 
 # ========== 학습 파라미터 ========== #
+parser = argparse.ArgumentParser(description="CLI arguments for the script")
+parser.add_argument(
+    "--epochs", type=int, default=10000, help="Number of epochs for training"
+)
+parser.add_argument(
+    "--batch_size", type=int, default=1000, help="Batch size for training"
+)
+parser.add_argument(
+    "--output_path",
+    type=str,
+    default=f".tmp/{uuid4().hex}",
+    help="Path to save the model",
+)
+parser.add_argument(
+    "--seq_len", type=int, default=64, help="Sequence length for LSTM"
+)
+parser.add_argument(
+    "--ann_model_path", type=str, default=None, help="Path to ANN model"
+)
+parser.add_argument(
+    "--use_multiprocessing",
+    type=bool,
+    default=False,
+    help="Whether to use multiprocessing",
+)
+# ================================== #
+
+# ========== 건드리지 말 것 ========== #
+args = parser.parse_args()
 EPOCHS = args.epochs  # 학습 횟수
 BATCH_SIZE = args.batch_size  # 배치 사이즈
 OUTPUT_PATH = args.output_path  # 모델 저장 경로
@@ -41,7 +62,9 @@ SEQ_LEN = args.seq_len  # SS-curve의 길이
 ANN_MODEL_PATH = args.ann_model_path  # ANN 모델 경로
 PATIENCE = EPOCHS // 10  # 조기 종료 기준
 PRINT_PER_EPOCH = EPOCHS // 100  # 학습 횟수 당 로그 출력 횟수
-USE_MULTIPROCESSING = args.use_multiprocessing  # 멀티프로세싱 사용 여부 (True 사용시 CPU 사용률 100%)
+USE_MULTIPROCESSING = (
+    args.use_multiprocessing
+)  # 멀티프로세싱 사용 여부 (True 사용시 CPU 사용률 100%)
 LSTMInputParams = ["stress"] + ANNInputParams  # LSTM 모델의 입력 파라미터
 LSTMOutputParams = ["stress"]  # LSTM 모델의 출력 파라미터
 # ================================== #
@@ -160,8 +183,9 @@ class TestLSTM(unittest.TestCase):
             y_test[random_idx : random_idx + 1],
         )
 
+
 if __name__ == "__main__":
     # test_train_and_inference 수행
     suite = unittest.TestSuite()
-    suite.addTest(TestLSTM('test_train_and_inference'))
+    suite.addTest(TestLSTM("test_train_and_inference"))
     unittest.TextTestRunner().run(suite)

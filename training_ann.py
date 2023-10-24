@@ -24,6 +24,8 @@ from nn.train import Trainer
 from nn.utils.logger import ApiLogger
 
 logger = ApiLogger(__name__)
+
+# ========== 학습 파라미터 ========== #
 parser = argparse.ArgumentParser(description="CLI arguments for the script")
 parser.add_argument(
     "--epochs", type=int, default=10000, help="Number of epochs for training"
@@ -34,7 +36,7 @@ parser.add_argument(
 parser.add_argument(
     "--output_path",
     type=str,
-    default=f".tmp/{uuid4().hex}",
+    default=f"",
     help="Path to save the model",
 )
 parser.add_argument(
@@ -43,13 +45,57 @@ parser.add_argument(
     default=False,
     help="Whether to use multiprocessing",
 )
+parser.add_argument(
+    "--lr",
+    nargs="+",
+    type=float,
+    default=[0.001, 0.005, 0.01],
+    help="Learning rate values. Example: --lr 0.001 0.005 0.01",
+)
+parser.add_argument(
+    "--n1",
+    nargs="+",
+    type=int,
+    default=[20, 30, 40],
+    help="Values for n1. Example: --n1 20 30 40",
+)
+parser.add_argument(
+    "--n2",
+    nargs="+",
+    type=int,
+    default=[10, 20, 30],
+    help="Values for n2. Example: --n2 10 20 30",
+)
+parser.add_argument(
+    "--n3",
+    nargs="+",
+    type=int,
+    default=[5, 10, 15, 20],
+    help="Values for n3. Example: --n3 5 10 15 20",
+)
+parser.add_argument(
+    "--dropout_rate",
+    nargs="+",
+    type=float,
+    default=[0.0, 0.3, 0.5],
+    help="Values for dropout_rate. Example: --dropout_rate 0.0 0.3 0.5",
+)
+# ================================== #
 
+# ========== 건드리지 마세요 ========== #
 args = parser.parse_args()
-
-# ========== 학습 파라미터 ========== #
 EPOCHS = args.epochs  # 학습 횟수
 BATCH_SIZE = args.batch_size  # 배치 사이즈
-OUTPUT_PATH = args.output_path  # 모델 저장 경로
+ALL_HYPER_PARAMS = {
+    "lr": args.lr,
+    "n1": args.n1,
+    "n2": args.n2,
+    "n3": args.n3,
+    "dropout_rate": args.dropout_rate,
+}
+OUTPUT_PATH = (
+    args.output_path if args.output_path else f"./output/{uuid4().hex}"
+)  # 모델 저장 경로
 PATIENCE = EPOCHS // 10  # 조기 종료 기준
 PRINT_PER_EPOCH = EPOCHS // 100  # 학습 횟수 당 로그 출력 횟수
 USE_MULTIPROCESSING = (
@@ -72,12 +118,6 @@ ANNOutputParams = [
     "weight",
     "elongation",
 ]
-GRID_SEARCH_HYPER_PARAMS = {
-    "lr": (0.001, 0.005, 0.01),
-    "n1": (20, 30, 40),
-    "n2": (10, 20, 30),
-    "n3": (5, 10, 15, 20),
-}
 # ================================== #
 
 
@@ -105,7 +145,7 @@ class TestANN(unittest.TestCase):
             normalize_layer=False,
             dim_out=len(ANNOutputParams),
         )
-        self.all_hyper_params = GRID_SEARCH_HYPER_PARAMS
+        logger.debug(f"all_hyper_params: {ALL_HYPER_PARAMS}")
         dataset = read_all(dropna=True)
         train_inputs = dataset[self.input_params].astype(float)
         train_outputs = dataset[self.output_params].astype(float)
@@ -136,9 +176,9 @@ class TestANN(unittest.TestCase):
 
     def test_train_and_inference(self):
         num_hyper_params = reduce(
-            lambda x, y: x * len(y), self.all_hyper_params.values(), 1
+            lambda x, y: x * len(y), ALL_HYPER_PARAMS.values(), 1
         )
-        for fstem, phist in self.trainer.hyper_train(self.all_hyper_params):
+        for fstem, phist in self.trainer.hyper_train(ALL_HYPER_PARAMS):
             num_hyper_params -= 1
             json.dumps(phist["train_output"], indent=4)
             self.test_inference(fstem + ".keras")
