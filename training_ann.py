@@ -20,6 +20,8 @@ from nn.schemas import (
     ANNOutputParams,
     read_all,
     read_all_no_ss,
+    select_rows_based_on_last_index,
+    
 )
 from nn.train import Trainer
 from nn.utils.logger import ApiLogger
@@ -200,27 +202,28 @@ def ABSPLA_vs_PETG(
     return data_loader, validation_data_loader
 
 
-def ABSPLApetg_vs_PETG(
+def ABSPLApetg12_vs_petg3(
     model_config, input_params, output_params
 ):
     # 데이터셋 로드
-    dataset = read_all(table_filename="table.csv", dropna=True)
-    petg_dataset = read_all_no_ss(table_filename="petg_table.csv")
+    petg_dataset = read_all_no_ss(table_filename="petg_table.csv", dropna=True)
+    train_dataset = select_rows_based_on_last_index(petg_dataset, last_indices=[1,2])
+    validation_dataset = select_rows_based_on_last_index(petg_dataset, last_indices=[3,4])
 
     # 학습 X, Y 데이터셋 분리
-    train_inputs = dataset[input_params].astype(float)
+    train_inputs = train_dataset[input_params].astype(float)
     train_inputs = train_inputs[~train_inputs.index.duplicated(keep="first")]
-    train_outputs = dataset[output_params].astype(float)
+    train_outputs = train_dataset[output_params].astype(float)
     train_outputs = train_outputs[
         ~train_outputs.index.duplicated(keep="first")
     ]
 
     # 검증 데이터셋 분리
-    validation_inputs = petg_dataset[input_params].astype(float)
+    validation_inputs = validation_dataset[input_params].astype(float)
     validation_inputs = validation_inputs[
         ~validation_inputs.index.duplicated(keep="first")
     ]
-    validation_outputs = petg_dataset[output_params].astype(float)
+    validation_outputs = validation_dataset[output_params].astype(float)
     validation_outputs = validation_outputs[
         ~validation_outputs.index.duplicated(keep="first")
     ]
@@ -240,20 +243,22 @@ def ABSPLApetg_vs_PETG(
         train_input_params=input_params,
         train_output_params=output_params,
     )
+
     print(train_inputs.shape, train_outputs.shape)
     return data_loader, validation_data_loader
 
-
 class TestANN(unittest.TestCase):
     def setUp(self) -> None:
+        #########################################
         if MODE == 0:
             dataload_callback = ABSPLA_vs_ABSPLA
         elif MODE == 1:
             dataload_callback = ABSPLA_vs_PETG
         elif MODE == 2:
-            dataload_callback = ABSPLApetg_vs_PETG
+            dataload_callback = ABSPLApetg12_vs_petg3
         else:
             raise ValueError("Invalid MODE")
+        ########################################
         self.model_class = ANN
         self.input_params = ANNInputParams
         self.output_params = ANNOutputParams

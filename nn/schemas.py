@@ -54,6 +54,15 @@ ANNOutputParams = [
 LSTMInputParams = ["stress"] + ANNInputParams
 LSTMOutputParams = ["stress"]
 
+def select_rows_based_on_last_index(df: pd.DataFrame, last_indices: List[int]) -> pd.DataFrame:
+    # 주어진 dataframe에서 인덱스 값을 추출
+    indices = df.index.tolist()
+    
+    # 마지막 %d 부분이 last_indices에 포함되어 있는지 확인
+    selected_indices = [idx for idx in indices if int(idx.split('-')[-1]) in last_indices]
+    
+    # 해당하는 행만 선택하여 반환
+    return df.loc[selected_indices]
 
 def normalize_1d_sequence(sequence: np.ndarray, trg_len: int) -> np.ndarray:
     assert len(sequence.shape) == 1, sequence.shape
