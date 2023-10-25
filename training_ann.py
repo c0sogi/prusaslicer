@@ -134,16 +134,32 @@ ANNOutputParams = [
 
 
 # ================================== #
-def ABSPLA_vs_ABSPLA(model_config, input_params, output_params):
+def ABSPLA_vs_ABSPLA(input_params, output_params):
     # 데이터셋 로드
     dataset = read_all(table_filename="table.csv", dropna=True)
+    train_dataset = select_rows_based_on_last_index(
+        dataset, last_indices=[1, 2, 3, 4]
+    )
+    validation_dataset = select_rows_based_on_last_index(
+        dataset, last_indices=[5]
+    )
 
     # 학습 X, Y 데이터셋 분리
-    train_inputs = dataset[input_params].astype(float)
+    train_inputs = train_dataset[input_params].astype(float)
     train_inputs = train_inputs[~train_inputs.index.duplicated(keep="first")]
-    train_outputs = dataset[output_params].astype(float)
+    train_outputs = train_dataset[output_params].astype(float)
     train_outputs = train_outputs[
         ~train_outputs.index.duplicated(keep="first")
+    ]
+
+    # 검증 데이터셋 분리
+    validation_inputs = validation_dataset[input_params].astype(float)
+    validation_inputs = validation_inputs[
+        ~validation_inputs.index.duplicated(keep="first")
+    ]
+    validation_outputs = validation_dataset[output_params].astype(float)
+    validation_outputs = validation_outputs[
+        ~validation_outputs.index.duplicated(keep="first")
     ]
 
     # 데이터셋 로더 생성
@@ -153,10 +169,16 @@ def ABSPLA_vs_ABSPLA(model_config, input_params, output_params):
         train_input_params=input_params,
         train_output_params=output_params,
     )
-    return data_loader, None
+    validation_data_loader = DataLoader(
+        train_inputs=validation_inputs,
+        train_outputs=validation_outputs,
+        train_input_params=input_params,
+        train_output_params=output_params,
+    )
+    return data_loader, validation_data_loader
 
 
-def ABSPLA_vs_PETG(model_config, input_params, output_params):
+def ABSPLA_vs_PETG(input_params, output_params):
     # 데이터셋 로드
     dataset = read_all(table_filename="table.csv", dropna=True)
     petg_dataset = read_all_no_ss(table_filename="petg_table.csv")
@@ -195,7 +217,7 @@ def ABSPLA_vs_PETG(model_config, input_params, output_params):
     return data_loader, validation_data_loader
 
 
-def ABSPLApetg12_vs_petg3(model_config, input_params, output_params):
+def ABSPLApetg12_vs_petg3(input_params, output_params):
     # 데이터셋 로드
     petg_dataset = read_all_no_ss(table_filename="petg_table.csv")
     train_dataset = select_rows_based_on_last_index(
@@ -278,7 +300,6 @@ class TestANN(unittest.TestCase):
             self.data_loader,
             self.validation_data_loader,
         ) = dataload_callback(
-            model_config=self.model_config,
             input_params=self.input_params,
             output_params=self.output_params,
         )
