@@ -28,6 +28,18 @@ from nn.utils.logger import ApiLogger
 
 logger = ApiLogger(__name__)
 
+
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise argparse.ArgumentTypeError("Boolean value expected.")
+
+
 # ========== 학습 파라미터 ========== #
 parser = argparse.ArgumentParser(description="CLI arguments for the script")
 parser.add_argument(
@@ -83,7 +95,7 @@ parser.add_argument(
     "--patience",
     nargs="+",
     type=float,
-    default=[250, 500, 1000],
+    default=[1000, 1500, 2000],
     help="Values for patience. Example: --patience 250 500 1000",
 )
 parser.add_argument(
@@ -91,6 +103,41 @@ parser.add_argument(
     type=str,
     default="a",
     help="Mode for training. 0: ABSPLA vs ABSPLA, 1: ABSPLA vs PETG, 2: ABSPLA+PETG vs PETG",
+)
+parser.add_argument(
+    "--dropout_rate",
+    nargs="+",
+    type=float,
+    default=[0.0],
+    help="Values for dropout_rate. Example: --dropout_rate 0.0 0.1 0.2",
+)
+parser.add_argument(
+    "--l1_reg",
+    nargs="+",
+    type=float,
+    default=[None],
+    help="Values for l1_reg. Example: --l1_reg 0.0 0.1 0.2",
+)
+parser.add_argument(
+    "--l2_reg",
+    nargs="+",
+    type=float,
+    default=[None],
+    help="Values for l2_reg. Example: --l2_reg 0.0 0.1 0.2",
+)
+parser.add_argument(
+    "--normalize_layer",
+    nargs="+",
+    type=str2bool,
+    default=[False],
+    help="Values for normalize_layer. Example: --normalize_layer True False",
+)
+parser.add_argument(
+    "--freeze_layers",
+    nargs="+",
+    type=str,
+    default=[],
+    help="Values for freeze_layers. Example: --freeze_layers dense1 dense2 dense3",
 )
 # ================================== #
 
@@ -103,6 +150,10 @@ ALL_HYPER_PARAMS = {
     "lr": args.lr,
     "patience": args.patience,
     "batch_size": args.batch_size,
+    "dropout_rate": args.dropout_rate,
+    "l1_reg": args.l1_reg,
+    "l2_reg": args.l2_reg,
+    "normalize_layer": args.normalize_layer,
 }
 MODEL_PATH = args.model_path  # 모델 경로
 assert MODEL_PATH.endswith(".keras"), f"{MODEL_PATH} is not a keras model"
@@ -113,7 +164,8 @@ OUTPUT_PATH = (
     args.output_path if args.output_path else f"./output/MODE{MODE}"
 )  # 모델 저장 경로
 PATIENCE = args.patience  # 조기 종료 기준
-PRINT_PER_EPOCH = EPOCHS // 100  # 학습 횟수 당 로그 출력 횟수
+FREEZE_LAYERS = args.freeze_layers  # 얼리기할 레이어
+PRINT_PER_EPOCH = EPOCHS // 1000  # 학습 횟수 당 로그 출력 횟수
 USE_MULTIPROCESSING = (
     args.use_multiprocessing
 )  # 멀티프로세싱 사용 여부 (True 사용시 CPU 사용률 100%)
@@ -210,11 +262,12 @@ class TestANN(unittest.TestCase):
                 for output_param in ANNOutputParams
             ],
             loss_weights=[0.5 for _ in range(len(ANNOutputParams))],
-            l1_reg=None,
-            l2_reg=None,
-            dropout_rate=0.0,
-            normalize_layer=False,
+            l1_reg=args.l1_reg[0],
+            l2_reg=args.l2_reg[0],
+            dropout_rate=args.dropout_rate[0],
+            normalize_layer=args.normalize_layer[0],
             dim_out=len(ANNOutputParams),
+            freeze_layers=FREEZE_LAYERS,
         )
         logger.debug(f"all_hyper_params: {ALL_HYPER_PARAMS}")
         (

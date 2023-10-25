@@ -92,6 +92,11 @@ class ANN(Model):
             else None
         )
         self.dense_out = Dense(units=model_config.dim_out)
+
+        freeze_layers = model_config.freeze_layers
+        if freeze_layers:
+            for layer in freeze_layers:
+                getattr(self, layer).trainable = False
         self.compile(
             optimizer=self.optimizer,
             loss=weighted_loss(

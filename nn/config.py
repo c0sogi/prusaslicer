@@ -36,6 +36,9 @@ class BaseModelConfig:
     dropout_rate: float = 0.0
     normalize_layer: bool = False
 
+    # 전이학습용
+    freeze_layers: List[str] = field(default_factory=lambda: [])
+
     def __post_init__(self) -> None:
         try:
             activations.get(self.activation)
