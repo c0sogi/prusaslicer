@@ -44,6 +44,7 @@ class Trainer:
     use_multiprocessing: bool = True
     validation_split: float = 0.1
     validation_data_loader: Optional[DataLoader] = None
+    pretrained_model_path: Optional[str] = None
 
     def __post_init__(self) -> None:
         self._model_name = self.model_name or str(self.model_class.__name__)
@@ -253,28 +254,44 @@ class Trainer:
         hyper_params: Optional[HyperParamsDict] = None,
         kfold_case: Optional[int] = None,
     ) -> Tuple[keras.Model, PickleHistory]:
-        last_epoch, matched_stem = self.find_stem_of_last_epoch(
-            self.get_filename_without_ext(
-                epochs=model_config.epochs,
-                hyper_params=hyper_params,
-                kfold_case=kfold_case,
-            )
-            + ".keras"
-        )
-        if last_epoch is not None and matched_stem is not None:
-            model = keras.models.load_model(matched_stem + ".keras")
+        if self.pretrained_model_path is not None:
+            model = keras.models.load_model(self.pretrained_model_path)
             if model is None:
-                raise ValueError(f"Model not found: {matched_stem}")
+                raise ValueError(
+                    f"Pretrained model not found: {self.pretrained_model_path}"
+                )
             logger.info(
-                f"Loading model [{matched_stem}] with last: {last_epoch}"
+                f"Loading pretrained model: {self.pretrained_model_path}"
             )
-            return model, load_pickle(Path(matched_stem + ".pkl"))
-        return self.model_class(model_config), PickleHistory(
-            train_input=TrainInput(
-                hyper_params=hyper_params or {}, config=model_config
-            ),
-            train_output=TrainOutput(),
-        )
+            return model, PickleHistory(
+                train_input=TrainInput(
+                    hyper_params=hyper_params or {}, config=model_config
+                ),
+                train_output=TrainOutput(),
+            )
+        else:
+            last_epoch, matched_stem = self.find_stem_of_last_epoch(
+                self.get_filename_without_ext(
+                    epochs=model_config.epochs,
+                    hyper_params=hyper_params,
+                    kfold_case=kfold_case,
+                )
+                + ".keras"
+            )
+            if last_epoch is not None and matched_stem is not None:
+                model = keras.models.load_model(matched_stem + ".keras")
+                if model is None:
+                    raise ValueError(f"Model not found: {matched_stem}")
+                logger.info(
+                    f"Loading model [{matched_stem}] with last: {last_epoch}"
+                )
+                return model, load_pickle(Path(matched_stem + ".pkl"))
+            return self.model_class(model_config), PickleHistory(
+                train_input=TrainInput(
+                    hyper_params=hyper_params or {}, config=model_config
+                ),
+                train_output=TrainOutput(),
+            )
 
     def get_filename_without_ext(
         self,

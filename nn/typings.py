@@ -1,3 +1,4 @@
+from typing_extensions import NotRequired
 from typing import (
     TYPE_CHECKING,
     Callable,
@@ -5,7 +6,6 @@ from typing import (
     List,
     Literal,
     Mapping,
-    NotRequired,
     TypedDict,
     Union,
 )
