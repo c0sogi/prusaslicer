@@ -63,6 +63,8 @@ def weighted_loss(
             if i == 0:
                 loss = w * lf(y_true[:, i], y_pred[:, i])
             else:
+                print(f"y_true shape: {y_true.shape}")
+                print(f"y_pred shape: {y_pred.shape}")
                 loss += w * lf(y_true[:, i], y_pred[:, i])  # type: ignore
         return loss  # type: ignore
 

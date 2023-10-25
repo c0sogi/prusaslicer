@@ -3,8 +3,9 @@ import argparse
 from functools import reduce
 import json
 import multiprocessing
+from pathlib import Path
 import random
-from typing import Tuple
+from typing import Iterable, List, Tuple
 import unittest
 from uuid import uuid4
 import numpy as np
@@ -33,15 +34,6 @@ parser.add_argument(
     "--epochs", type=int, default=10000, help="Number of epochs for training"
 )
 parser.add_argument(
-    "--patience",
-    type=int,
-    default=1000,
-    help="Number of early stopping epochs for training",
-)
-parser.add_argument(
-    "--batch_size", type=int, default=1000, help="Batch size for training"
-)
-parser.add_argument(
     "--output_path",
     type=str,
     default=f"",
@@ -49,7 +41,8 @@ parser.add_argument(
 )
 parser.add_argument(
     "--use_multiprocessing",
-    action="store_true",
+    type=bool,
+    default=False,
     help="Whether to use multiprocessing",
 )
 parser.add_argument(
@@ -60,37 +53,43 @@ parser.add_argument(
     help="Learning rate values. Example: --lr 0.001 0.005 0.01",
 )
 parser.add_argument(
-    "--n1",
+    "--batch_size",
     nargs="+",
     type=int,
-    default=[20, 30, 40],
-    help="Values for n1. Example: --n1 20 30 40",
+    default=[2, 4, 8],
+    help="Values for batch_size. Example: --batch_size 2 4 8",
 )
 parser.add_argument(
-    "--n2",
+    "--model_path",
+    type=str,
+    required=True,
+    help="Path to base model to transfer",
+)
+parser.add_argument(
+    "--train_indices",
     nargs="+",
     type=int,
-    default=[10, 20, 30],
-    help="Values for n2. Example: --n2 10 20 30",
+    required=True,
+    help="Indices for training",
 )
 parser.add_argument(
-    "--n3",
+    "--validation_indices",
     nargs="+",
     type=int,
-    default=[5, 10, 15, 20],
-    help="Values for n3. Example: --n3 5 10 15 20",
+    required=True,
+    help="Indices for validation",
 )
 parser.add_argument(
-    "--dropout_rate",
+    "--patience",
     nargs="+",
     type=float,
-    default=[0.0, 0.3, 0.5],
-    help="Values for dropout_rate. Example: --dropout_rate 0.0 0.3 0.5",
+    default=[250, 500, 1000],
+    help="Values for patience. Example: --patience 250 500 1000",
 )
 parser.add_argument(
     "--mode",
-    type=int,
-    default=0,
+    type=str,
+    default="a",
     help="Mode for training. 0: ABSPLA vs ABSPLA, 1: ABSPLA vs PETG, 2: ABSPLA+PETG vs PETG",
 )
 # ================================== #
@@ -102,10 +101,14 @@ EPOCHS = args.epochs  # 학습 횟수
 BATCH_SIZE = args.batch_size  # 배치 사이즈
 ALL_HYPER_PARAMS = {
     "lr": args.lr,
-    "n1": args.n1,
-    "n2": args.n2,
-    "n3": args.n3,
+    "patience": args.patience,
+    "batch_size": args.batch_size,
 }
+MODEL_PATH = args.model_path  # 모델 경로
+assert MODEL_PATH.endswith(".keras"), f"{MODEL_PATH} is not a keras model"
+assert Path(MODEL_PATH).exists(), f"{MODEL_PATH} does not exist"
+TRAIN_INDICES = args.train_indices  # 학습 데이터 인덱스
+VALIDATION_INDICES = args.validation_indices  # 검증 데이터 인덱스
 OUTPUT_PATH = (
     args.output_path if args.output_path else f"./output/MODE{MODE}"
 )  # 모델 저장 경로
@@ -134,75 +137,21 @@ ANNOutputParams = [
 
 
 # ================================== #
-def ABSPLA_vs_ABSPLA(model_config, input_params, output_params):
-    # 데이터셋 로드
-    dataset = read_all(table_filename="table.csv", dropna=True)
-
-    # 학습 X, Y 데이터셋 분리
-    train_inputs = dataset[input_params].astype(float)
-    train_inputs = train_inputs[~train_inputs.index.duplicated(keep="first")]
-    train_outputs = dataset[output_params].astype(float)
-    train_outputs = train_outputs[
-        ~train_outputs.index.duplicated(keep="first")
-    ]
-
-    # 데이터셋 로더 생성
-    data_loader = DataLoader(
-        train_inputs=train_inputs,
-        train_outputs=train_outputs,
-        train_input_params=input_params,
-        train_output_params=output_params,
-    )
-    return data_loader, None
 
 
-def ABSPLA_vs_PETG(model_config, input_params, output_params):
-    # 데이터셋 로드
-    dataset = read_all(table_filename="table.csv", dropna=True)
-    petg_dataset = read_all_no_ss(table_filename="petg_table.csv")
-
-    # 학습 X, Y 데이터셋 분리
-    train_inputs = dataset[input_params].astype(float)
-    train_inputs = train_inputs[~train_inputs.index.duplicated(keep="first")]
-    train_outputs = dataset[output_params].astype(float)
-    train_outputs = train_outputs[
-        ~train_outputs.index.duplicated(keep="first")
-    ]
-
-    # 검증 데이터셋 분리
-    validation_inputs = petg_dataset[input_params].astype(float)
-    validation_inputs = validation_inputs[
-        ~validation_inputs.index.duplicated(keep="first")
-    ]
-    validation_outputs = petg_dataset[output_params].astype(float)
-    validation_outputs = validation_outputs[
-        ~validation_outputs.index.duplicated(keep="first")
-    ]
-
-    # 데이터셋 로더 생성
-    data_loader = DataLoader(
-        train_inputs=train_inputs,
-        train_outputs=train_outputs,
-        train_input_params=input_params,
-        train_output_params=output_params,
-    )
-    validation_data_loader = DataLoader(
-        train_inputs=validation_inputs,
-        train_outputs=validation_outputs,
-        train_input_params=input_params,
-        train_output_params=output_params,
-    )
-    return data_loader, validation_data_loader
-
-
-def ABSPLApetg12_vs_petg3(model_config, input_params, output_params):
+def transfer_petg_from_ABSPLA(
+    train_indices: List[int],
+    validation_indices: List[int],
+    input_params: Iterable[str],
+    output_params: Iterable[str],
+):
     # 데이터셋 로드
     petg_dataset = read_all_no_ss(table_filename="petg_table.csv")
     train_dataset = select_rows_based_on_last_index(
-        petg_dataset, last_indices=[1, 2]
+        petg_dataset, last_indices=train_indices
     )
     validation_dataset = select_rows_based_on_last_index(
-        petg_dataset, last_indices=[3, 4]
+        petg_dataset, last_indices=validation_indices
     )
 
     # 학습 X, Y 데이터셋 분리
@@ -241,16 +190,10 @@ def ABSPLApetg12_vs_petg3(model_config, input_params, output_params):
 
 class TestANN(unittest.TestCase):
     def setUp(self) -> None:
-        #########################################
-        if MODE == 0:
-            dataload_callback = ABSPLA_vs_ABSPLA
-        elif MODE == 1:
-            dataload_callback = ABSPLA_vs_PETG
-        elif MODE == 2:
-            dataload_callback = ABSPLApetg12_vs_petg3
+        if MODE == "a":
+            dataload_callback = transfer_petg_from_ABSPLA
         else:
             raise ValueError("Invalid MODE")
-        ########################################
         self.model_class = ANN
         self.input_params = ANNInputParams
         self.output_params = ANNOutputParams
@@ -259,9 +202,9 @@ class TestANN(unittest.TestCase):
             metrics=["mse", "mae", "mape"],
             kfold_splits=0,
             print_per_epoch=PRINT_PER_EPOCH,
-            batch_size=BATCH_SIZE,
+            batch_size=BATCH_SIZE[0],
             epochs=EPOCHS,
-            patience=PATIENCE,
+            patience=PATIENCE[0],
             loss_funcs=[
                 "mape" if output_param == "lengthavg" else "mae"
                 for output_param in ANNOutputParams
@@ -278,7 +221,8 @@ class TestANN(unittest.TestCase):
             self.data_loader,
             self.validation_data_loader,
         ) = dataload_callback(
-            model_config=self.model_config,
+            train_indices=TRAIN_INDICES,
+            validation_indices=VALIDATION_INDICES,
             input_params=self.input_params,
             output_params=self.output_params,
         )
@@ -290,6 +234,7 @@ class TestANN(unittest.TestCase):
             model_config=self.model_config,
             workers=multiprocessing.cpu_count(),
             use_multiprocessing=USE_MULTIPROCESSING,
+            pretrained_model_path=MODEL_PATH,
         )
 
     def test_train_and_inference(self):

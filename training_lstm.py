@@ -112,7 +112,6 @@ class TestLSTM(unittest.TestCase):
         self.train_inputs = encoder_inputs
         self.train_outputs = decoder_outputs
         self.data_loader = DataLoader(
-            model_config=self.model_config,
             train_inputs=self.train_inputs,
             train_outputs=self.train_outputs,
             train_input_params=self.input_params,

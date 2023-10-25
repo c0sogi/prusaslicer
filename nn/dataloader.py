@@ -57,8 +57,6 @@ def load_jsonl(file_path: os.PathLike) -> List[Dict[str, object]]:
 
 @dataclass
 class DataLoader:
-    model_config: BaseModelConfig
-
     train_inputs: DataLike
     train_outputs: SingleData
 
