@@ -13,3 +13,4 @@ PRIVATE_*
 checkpoint/*
 !printer/*
 !template.ini
+!best_models/*
