@@ -53,8 +53,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--use_multiprocessing",
-    type=bool,
-    default=False,
+    action="store_true",
     help="Whether to use multiprocessing",
 )
 parser.add_argument(
@@ -198,7 +197,7 @@ def transfer_petg_from_ABSPLA(
     output_params: Iterable[str],
 ):
     # 데이터셋 로드
-    petg_dataset = read_all_no_ss(table_filename="petg_table.csv")
+    petg_dataset = read_all_no_ss(table_filename="train_petg.csv")
     train_dataset = select_rows_based_on_last_index(
         petg_dataset, last_indices=train_indices
     )
