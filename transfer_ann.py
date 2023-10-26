@@ -78,16 +78,16 @@ parser.add_argument(
 )
 parser.add_argument(
     "--train_indices",
-    nargs="+",
+    nargs="*",
+    default=[],
     type=int,
-    required=True,
     help="Indices for training",
 )
 parser.add_argument(
     "--validation_indices",
-    nargs="+",
+    nargs="*",
+    default=[],
     type=int,
-    required=True,
     help="Indices for validation",
 )
 parser.add_argument(

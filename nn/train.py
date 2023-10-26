@@ -45,6 +45,7 @@ class Trainer:
     validation_split: float = 0.1
     validation_data_loader: Optional[DataLoader] = None
     pretrained_model_path: Optional[str] = None
+    early_stopping_monitor: str = "val_loss"
 
     def __post_init__(self) -> None:
         self._model_name = self.model_name or str(self.model_class.__name__)
@@ -238,7 +239,11 @@ class Trainer:
     ) -> List[keras.callbacks.Callback]:
         callbacks = []  # type: List[keras.callbacks.Callback]
         if patience is not None:
-            callbacks.append(EarlyStopping(patience=patience))
+            callbacks.append(
+                EarlyStopping(
+                    patience=patience, monitor=self.early_stopping_monitor
+                )
+            )
         if print_per_epoch is not None:
             callbacks.append(
                 AccuracyPerEpoch(
