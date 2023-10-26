@@ -16,8 +16,6 @@ from nn.config import ANNModelConfig
 from nn.dataloader import DataLoader
 from nn.inference import inference
 from nn.schemas import (
-    ANNInputParams,
-    ANNOutputParams,
     read_all,
     read_all_no_ss,
     select_rows_based_on_last_index,
@@ -26,6 +24,23 @@ from nn.train import Trainer
 from nn.utils.logger import ApiLogger
 
 logger = ApiLogger(__name__)
+ANNInputParams = [  # ANN 모델의 입력 파라미터
+    "bedtemp",
+    "exttemp",
+    "layerthickness",
+    "density",
+    "thermalresistance",
+    "impactstrength",
+    "glasstransitiontemp",
+    "thermalconductivity",
+    "linearthermalexpansioncoefficient",
+]
+ANNOutputParams = [
+    "strength",
+    "lengthavg",
+    "weight",
+    # "elongation",
+]
 
 # ========== 학습 파라미터 ========== #
 parser = argparse.ArgumentParser(description="CLI arguments for the script")
@@ -95,45 +110,7 @@ parser.add_argument(
 )
 # ================================== #
 
-# ========== 건드리지 마세요 ========== #
-args = parser.parse_args()
-MODE = args.mode  # 학습 모드
-EPOCHS = args.epochs  # 학습 횟수
-BATCH_SIZE = args.batch_size  # 배치 사이즈
-ALL_HYPER_PARAMS = {
-    "lr": args.lr,
-    "n1": args.n1,
-    "n2": args.n2,
-    "n3": args.n3,
-}
-OUTPUT_PATH = (
-    args.output_path if args.output_path else f"./output/MODE{MODE}"
-)  # 모델 저장 경로
-PATIENCE = args.patience  # 조기 종료 기준
-PRINT_PER_EPOCH = EPOCHS // 100  # 학습 횟수 당 로그 출력 횟수
-USE_MULTIPROCESSING = (
-    args.use_multiprocessing
-)  # 멀티프로세싱 사용 여부 (True 사용시 CPU 사용률 100%)
-ANNInputParams = [  # ANN 모델의 입력 파라미터
-    "bedtemp",
-    "exttemp",
-    "layerthickness",
-    "density",
-    "thermalresistance",
-    "impactstrength",
-    "glasstransitiontemp",
-    "thermalconductivity",
-    "linearthermalexpansioncoefficient",
-]
-ANNOutputParams = [
-    "strength",
-    "lengthavg",
-    "weight",
-    # "elongation",
-]
 
-
-# ================================== #
 def ABSPLA_vs_ABSPLA(input_params, output_params):
     # 데이터셋 로드
     dataset = read_all(table_filename="table.csv", dropna=True)
@@ -181,7 +158,7 @@ def ABSPLA_vs_ABSPLA(input_params, output_params):
 def ABSPLA_vs_PETG(input_params, output_params):
     # 데이터셋 로드
     dataset = read_all(table_filename="table.csv", dropna=True)
-    petg_dataset = read_all_no_ss(table_filename="petg_table.csv")
+    petg_dataset = read_all_no_ss(table_filename="train_petg.csv")
 
     # 학습 X, Y 데이터셋 분리
     train_inputs = dataset[input_params].astype(float)
@@ -219,7 +196,7 @@ def ABSPLA_vs_PETG(input_params, output_params):
 
 def ABSPLApetg12_vs_petg3(input_params, output_params):
     # 데이터셋 로드
-    petg_dataset = read_all_no_ss(table_filename="petg_table.csv")
+    petg_dataset = read_all_no_ss(table_filename="train_petg.csv")
     train_dataset = select_rows_based_on_last_index(
         petg_dataset, last_indices=[1, 2]
     )
@@ -262,7 +239,8 @@ def ABSPLApetg12_vs_petg3(input_params, output_params):
 
 
 class TestANN(unittest.TestCase):
-    def setUp(self) -> None:
+    @classmethod
+    def setUpClass(cls) -> None:
         #########################################
         if MODE == 0:
             dataload_callback = ABSPLA_vs_ABSPLA
@@ -273,10 +251,10 @@ class TestANN(unittest.TestCase):
         else:
             raise ValueError("Invalid MODE")
         ########################################
-        self.model_class = ANN
-        self.input_params = ANNInputParams
-        self.output_params = ANNOutputParams
-        self.model_config = ANNModelConfig(
+        cls.model_class = ANN
+        cls.input_params = ANNInputParams
+        cls.output_params = ANNOutputParams
+        cls.model_config = ANNModelConfig(
             output_path=OUTPUT_PATH,
             metrics=["mse", "mae", "mape"],
             kfold_splits=0,
@@ -297,18 +275,18 @@ class TestANN(unittest.TestCase):
         )
         logger.debug(f"all_hyper_params: {ALL_HYPER_PARAMS}")
         (
-            self.data_loader,
-            self.validation_data_loader,
+            cls.data_loader,
+            cls.validation_data_loader,
         ) = dataload_callback(
-            input_params=self.input_params,
-            output_params=self.output_params,
+            input_params=cls.input_params,
+            output_params=cls.output_params,
         )
-        self.trainer = Trainer(
-            data_loader=self.data_loader,
-            validation_data_loader=self.validation_data_loader,
-            model_class=self.model_class,
-            model_name=self.model_class.__name__,
-            model_config=self.model_config,
+        cls.trainer = Trainer(
+            data_loader=cls.data_loader,
+            validation_data_loader=cls.validation_data_loader,
+            model_class=cls.model_class,
+            model_name=cls.model_class.__name__,
+            model_config=cls.model_config,
             workers=multiprocessing.cpu_count(),
             use_multiprocessing=USE_MULTIPROCESSING,
         )
@@ -360,6 +338,28 @@ class TestANN(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    # ========== 건드리지 마세요 ========== #
+    args = parser.parse_args()
+    MODE = args.mode  # 학습 모드
+    EPOCHS = args.epochs  # 학습 횟수
+    BATCH_SIZE = args.batch_size  # 배치 사이즈
+    ALL_HYPER_PARAMS = {
+        "lr": args.lr,
+        "n1": args.n1,
+        "n2": args.n2,
+        "n3": args.n3,
+    }
+    OUTPUT_PATH = (
+        args.output_path if args.output_path else f"./output/MODE{MODE}"
+    )  # 모델 저장 경로
+    PATIENCE = args.patience  # 조기 종료 기준
+    PRINT_PER_EPOCH = EPOCHS // 100  # 학습 횟수 당 로그 출력 횟수
+    USE_MULTIPROCESSING = (
+        args.use_multiprocessing
+    )  # 멀티프로세싱 사용 여부 (True 사용시 CPU 사용률 100%)
+
+    # ================================== #
+
     # test_train_and_inference 수행
     suite = unittest.TestSuite()
     suite.addTest(TestANN("test_train_and_inference"))
