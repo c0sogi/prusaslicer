@@ -287,6 +287,9 @@ class TestANN(unittest.TestCase):
             workers=multiprocessing.cpu_count(),
             use_multiprocessing=USE_MULTIPROCESSING,
             pretrained_model_path=MODEL_PATH,
+            early_stopping_monitor="val_loss"
+            if VALIDATION_INDICES
+            else "loss",
         )
 
     def test_train_and_inference(self):
