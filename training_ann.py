@@ -1,10 +1,11 @@
 # flake8: noqa
 import argparse
-from functools import reduce
+from functools import partial, reduce
 import json
 import multiprocessing
 import random
-from typing import Tuple
+import re
+from typing import Iterable, List, Tuple
 import unittest
 from uuid import uuid4
 import numpy as np
@@ -104,8 +105,8 @@ parser.add_argument(
 )
 parser.add_argument(
     "--mode",
-    type=int,
-    default=0,
+    type=str,
+    default="0",
     help="Mode for training. 0: ABSPLA vs ABSPLA, 1: ABSPLA vs PETG, 2: ABSPLA+PETG vs PETG",
 )
 # ================================== #
@@ -194,14 +195,19 @@ def ABSPLA_vs_PETG(input_params, output_params):
     return data_loader, validation_data_loader
 
 
-def ABSPLApetg12_vs_petg3(input_params, output_params):
+def train_petg_from_ABSPLA(
+    train_indices: List[int],
+    validation_indices: List[int],
+    input_params: Iterable[str],
+    output_params: Iterable[str],
+):
     # 데이터셋 로드
     petg_dataset = read_all_no_ss(table_filename="train_petg.csv")
     train_dataset = select_rows_based_on_last_index(
-        petg_dataset, last_indices=[1, 2]
+        petg_dataset, last_indices=train_indices
     )
     validation_dataset = select_rows_based_on_last_index(
-        petg_dataset, last_indices=[3, 4]
+        petg_dataset, last_indices=validation_indices
     )
 
     # 학습 X, Y 데이터셋 분리
@@ -235,21 +241,42 @@ def ABSPLApetg12_vs_petg3(input_params, output_params):
         train_input_params=input_params,
         train_output_params=output_params,
     )
-    return data_loader, validation_data_loader
+    return data_loader, None
 
 
 class TestANN(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         #########################################
-        if MODE == 0:
+        use_validation_dataloader = False
+        if MODE == "0":
             dataload_callback = ABSPLA_vs_ABSPLA
-        elif MODE == 1:
+        elif MODE == "1":
             dataload_callback = ABSPLA_vs_PETG
-        elif MODE == 2:
-            dataload_callback = ABSPLApetg12_vs_petg3
+            dataload_callback = train_petg_from_ABSPLA
         else:
-            raise ValueError("Invalid MODE")
+
+            def extract_numbers(s):
+                pattern = r"t([0-9]*)v([0-9]*)"
+                match = re.match(pattern, s)
+
+                if match:
+                    list1 = [int(num) for num in match.group(1)]
+                    list2 = [int(num) for num in match.group(2)]
+                    return list1, list2
+                else:
+                    return [], []
+
+            t, v = extract_numbers(str(MODE))
+            if t:
+                dataload_callback = partial(
+                    train_petg_from_ABSPLA,
+                    train_indices=t,
+                    validation_indices=v,
+                )
+                use_validation_dataloader = True
+            else:
+                raise ValueError("Invalid MODE")
         ########################################
         cls.model_class = ANN
         cls.input_params = ANNInputParams
