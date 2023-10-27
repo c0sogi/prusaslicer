@@ -260,7 +260,10 @@ class Trainer:
         kfold_case: Optional[int] = None,
     ) -> Tuple[keras.Model, PickleHistory]:
         if self.pretrained_model_path is not None:
-            model = keras.models.load_model(self.pretrained_model_path)
+            model = keras.models.load_model(
+                self.pretrained_model_path,
+                custom_objects={self.model_class.__name__: self.model_class},
+            )
             if model is None:
                 raise ValueError(
                     f"Pretrained model not found: {self.pretrained_model_path}"
@@ -284,7 +287,12 @@ class Trainer:
                 + ".keras"
             )
             if last_epoch is not None and matched_stem is not None:
-                model = keras.models.load_model(matched_stem + ".keras")
+                model = keras.models.load_model(
+                    matched_stem + ".keras",
+                    custom_objects={
+                        self.model_class.__name__: self.model_class
+                    },
+                )
                 if model is None:
                     raise ValueError(f"Model not found: {matched_stem}")
                 logger.info(

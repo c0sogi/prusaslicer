@@ -1,4 +1,8 @@
 # flake8: noqa
+import os
+
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 import argparse
 from functools import reduce
 import json
@@ -164,7 +168,7 @@ OUTPUT_PATH = (
 )  # 모델 저장 경로
 PATIENCE = args.patience  # 조기 종료 기준
 FREEZE_LAYERS = args.freeze_layers  # 얼리기할 레이어
-PRINT_PER_EPOCH = EPOCHS // 1000  # 학습 횟수 당 로그 출력 횟수
+PRINT_PER_EPOCH = EPOCHS // 100  # 학습 횟수 당 로그 출력 횟수
 USE_MULTIPROCESSING = (
     args.use_multiprocessing
 )  # 멀티프로세싱 사용 여부 (True 사용시 CPU 사용률 100%)
