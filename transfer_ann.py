@@ -240,7 +240,7 @@ def transfer_petg_from_ABSPLA(
         train_input_params=input_params,
         train_output_params=output_params,
     )
-    return data_loader, validation_data_loader
+    return data_loader, validation_data_loader if validation_indices else None
 
 
 class TestANN(unittest.TestCase):
@@ -291,7 +291,7 @@ class TestANN(unittest.TestCase):
             workers=multiprocessing.cpu_count(),
             use_multiprocessing=USE_MULTIPROCESSING,
             pretrained_model_path=MODEL_PATH,
-            early_stopping_monitor="val_loss"
+            early_stopping_monitor="loss"
             if VALIDATION_INDICES
             else "loss",
         )
