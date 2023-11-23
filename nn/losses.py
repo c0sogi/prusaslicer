@@ -36,6 +36,22 @@ def convert_to_loss_func(
     raise ValueError(f"Unknown loss function type: {type(loss_func)}")
 
 
+def custom_loss_function(y_true, y_pred):
+    # seq_len에 대해 선형적으로 증가하는 가중치 생성
+    seq_len = tf.shape(y_true)[1]
+    weights = tf.linspace(1.0, 1.5, seq_len)  # 예: 시작은 1, 끝은 1.5로 가중치 증가
+    weights = tf.reshape(weights, (1, seq_len, 1))  # 가중치 형태 조정
+
+    # 제곱 오차 계산
+    squared_difference = tf.square(y_true - y_pred)
+
+    # 가중치 적용
+    weighted_squared_difference = squared_difference * weights
+
+    # 배치에 대한 평균 손실 반환
+    return tf.reduce_mean(weighted_squared_difference, axis=[1, 2])
+
+
 def weighted_loss(
     *loss_weights: float,
     loss_funcs: LossFuncs,

@@ -70,7 +70,9 @@ def select_rows_based_on_last_index(
     return df.loc[selected_indices]
 
 
-def normalize_1d_sequence(sequence: np.ndarray, trg_len: int) -> np.ndarray:
+def normalize_1d_sequence(
+    sequence: np.ndarray, trg_len: int, normalize: bool = True
+) -> np.ndarray:
     assert len(sequence.shape) in (1, 2), sequence.shape
     if len(sequence.shape) == 1:
         src_len = len(sequence)
@@ -79,15 +81,17 @@ def normalize_1d_sequence(sequence: np.ndarray, trg_len: int) -> np.ndarray:
             sequence,
             kind="linear",
         )
-        seq_new = f(np.linspace(0, src_len - 1, trg_len))
-        return (seq_new - np.min(seq_new)) / (
-            np.max(seq_new) - np.min(seq_new)
-        )
+        new_y = f(np.linspace(0, src_len - 1, trg_len))
+        if normalize:
+            new_y = (new_y - np.min(new_y)) / (np.max(new_y) - np.min(new_y))
+        return new_y.reshape(trg_len, 1)
     else:
         x = sequence[:, 0]
         y = sequence[:, 1]
         new_x = np.linspace(x.min(), x.max(), trg_len)
         new_y = interp1d(x, y)(new_x)
+        if normalize:
+            new_y = (new_y - new_y.min()) / (new_y.max() - new_y.min())
         return new_y.reshape(trg_len, 1)
 
 
