@@ -43,15 +43,17 @@ class EmbeddingAttentionLSTMRegressor(Model):
                 x = layer(x)
             self.feature_extractor = Model(inputs=input_tensor, outputs=x)
             self.feature_extractor.trainable = False
-            lstm_units = ann.model_config.n2
+            lstm_units = ann.model_config.n3
+            print("Loaded ANN model:", model_config.ann_model_path)
         else:
             self.feature_extractor = Dense(model_config.dim_in)
             lstm_units = model_config.dim_in
+            print("No ANN model is loaded.")
         self.encoder_lstm = LSTM(
             lstm_units, return_sequences=True, return_state=True
         )
         self.decoder_lstm = LSTM(
-    lstm_units, return_sequences=True, return_state=True
+            lstm_units, return_sequences=True, return_state=True
         )
         self.attention = BahdanauAttention(self.decoder_lstm.units)
         self.output_layer = Dense(1)

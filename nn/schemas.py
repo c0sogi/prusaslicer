@@ -71,15 +71,24 @@ def select_rows_based_on_last_index(
 
 
 def normalize_1d_sequence(sequence: np.ndarray, trg_len: int) -> np.ndarray:
-    assert len(sequence.shape) == 1, sequence.shape
-    src_len = len(sequence)
-    f = interp1d(
-        np.linspace(0, src_len - 1, src_len),
-        sequence,
-        kind="linear",
-    )
-    seq_new = f(np.linspace(0, src_len - 1, trg_len))
-    return (seq_new - np.min(seq_new)) / (np.max(seq_new) - np.min(seq_new))
+    assert len(sequence.shape) in (1, 2), sequence.shape
+    if len(sequence.shape) == 1:
+        src_len = len(sequence)
+        f = interp1d(
+            np.linspace(0, src_len - 1, src_len),
+            sequence,
+            kind="linear",
+        )
+        seq_new = f(np.linspace(0, src_len - 1, trg_len))
+        return (seq_new - np.min(seq_new)) / (
+            np.max(seq_new) - np.min(seq_new)
+        )
+    else:
+        x = sequence[:, 0]
+        y = sequence[:, 1]
+        new_x = np.linspace(x.min(), x.max(), trg_len)
+        new_y = interp1d(x, y)(new_x)
+        return new_y.reshape(trg_len, 1)
 
 
 def _read_single_ss_curve(
