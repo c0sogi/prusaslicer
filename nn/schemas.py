@@ -100,7 +100,7 @@ def _read_ss_curves(
     ss_data_dict: Dict[str, SSCurve] = {}
     for csv_dir_path in Path(raw_data_path).iterdir():
         for csv_file_path in csv_dir_path.glob("*.csv"):
-            numbers = findall(r"(\d+)\.(\d+)", csv_file_path.stem)
+            numbers = findall(r"(\d+).(\d+)", csv_file_path.stem)
             if numbers:
                 before_dot, after_dot = numbers[0]
                 key = f"{csv_dir_path.name.upper()}-{before_dot}-{after_dot}"
@@ -185,3 +185,21 @@ def read_all_no_ss(
     all_data = pd.concat([x_data, y_data], axis=1)
     logger.debug(f"===== Number of valid data: {all_data.shape[0]} =====")
     return all_data
+
+
+# def read_sscurves(
+#     raw_data_dir: os.PathLike = Path("./raw_data"),
+#     dropna: bool = True,
+# ) -> pd.DataFrame:
+#     # Load raw data (ss curves and table)
+#     ss_curves = _read_ss_curves(raw_data_dir)
+#     x_data, y_data = _read_x_and_y_from_table(
+#         Path(raw_data_dir) / table_filename
+#     )
+#     # for to_merge in (x_data, y_data):
+#     #     ss_curves = ss_curves.merge(to_merge, on="Name", how="left")
+#     if dropna:
+#         ss_curves.dropna(inplace=True)
+
+#     logger.debug(f"===== Number of valid data: {ss_curves.shape[0]} =====")
+#     return group_ss_curves(ss_curves)
