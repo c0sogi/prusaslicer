@@ -51,7 +51,7 @@ class EmbeddingAttentionLSTMRegressor(Model):
             embedding_dim = model_config.dim_in
             print("No ANN model is loaded.")
         self.multihead_attention = MultiHeadAttention(
-            num_heads=2, key_dim=embedding_dim
+            num_heads=model_config.num_heads, key_dim=embedding_dim
         )
 
         # 출력을 원하는 시퀀스 길이로 변환
@@ -69,18 +69,22 @@ class EmbeddingAttentionLSTMRegressor(Model):
     @tf.function
     def call(self, inputs):
         # feature_extractor를 통한 특징 추출
-        features = self.feature_extractor(inputs)
+        features = self.feature_extractor(
+            inputs
+        )  # (batch_size, embedding_dim)
 
-        # 입력 차원 확인 및 조정 (예시: 입력이 (batch_size, embedding_dim)인 경우)
+        # 차원 확장
         features = tf.expand_dims(
             features, axis=1
         )  # (batch_size, 1, embedding_dim)
 
-        # MultiHeadAttention 적용
-        attention_output = self.multihead_attention(features, features)
+        # MultiHeadAttention 레이어를 이용해 Self-Attention 수행
+        attention_output = self.multihead_attention(
+            features, features
+        )  # (batch_size, 1, embedding_dim)
 
         # 출력 변환
-        output = self.output_dense(attention_output)
+        output = self.output_dense(attention_output)  # (batch_size, seq_len)
         output = self.reshape_layer(output)
         return output
 

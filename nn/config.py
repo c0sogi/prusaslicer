@@ -87,6 +87,7 @@ class ANNModelConfig(BaseModelConfig):
 @dataclass
 class LSTMModelConfig(BaseModelConfig):
     seq_len: int = 512
+    num_heads: int = 2
     ann_model_path: Optional[str] = None
     state_transform_activation: str = "tanh"
 
